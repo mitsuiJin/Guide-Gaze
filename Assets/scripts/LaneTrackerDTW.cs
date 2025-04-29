@@ -1,11 +1,11 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
-public class LaneTracker : MonoBehaviour
+public class LaneTrackerDTW:MonoBehaviour
 {
     public LineRenderer colorLaneRenderer;
     public MousePathDrawer mouseDrawer;
-    public float frechetDistanceThreshold = 0.1f;
+    public float dtwDistanceThreshold = 0.2f; // DTW threshold 조정
 
     private bool hasChecked = false;
 
@@ -34,10 +34,10 @@ public class LaneTracker : MonoBehaviour
             return;
         }
 
-        float frechetDistance = CalculateFrechetDistance(colorLanePoints, drawnPoints);
-        Debug.Log("Frechet Distance: " + frechetDistance);
+        float dtwDistance = CalculateDTWDistance(colorLanePoints, drawnPoints);
+        Debug.Log("DTW Distance: " + dtwDistance);
 
-        if (frechetDistance < frechetDistanceThreshold)
+        if (dtwDistance < dtwDistanceThreshold)
         {
             Debug.Log("✅ Success: Drawn lane matches the color lane!");
         }
@@ -55,37 +55,40 @@ public class LaneTracker : MonoBehaviour
         return new List<Vector3>(positions);
     }
 
-    float CalculateFrechetDistance(List<Vector3> path1, List<Vector3> path2)
+    // DTW 계산 함수
+    float CalculateDTWDistance(List<Vector3> path1, List<Vector3> path2)
     {
         int n = path1.Count;
         int m = path2.Count;
 
-        if (n == 0 || m == 0)
-        {
-            return float.MaxValue;
-        }
-
+        // Dynamic Programming 테이블
         float[,] dp = new float[n, m];
+
+        // 초기값 설정
         dp[0, 0] = Vector3.Distance(path1[0], path2[0]);
 
+        // 첫 번째 열 채우기
         for (int i = 1; i < n; i++)
-            dp[i, 0] = Mathf.Max(dp[i - 1, 0], Vector3.Distance(path1[i], path2[0]));
+        {
+            dp[i, 0] = dp[i - 1, 0] + Vector3.Distance(path1[i], path2[0]);
+        }
 
+        // 첫 번째 행 채우기
         for (int j = 1; j < m; j++)
-            dp[0, j] = Mathf.Max(dp[0, j - 1], Vector3.Distance(path1[0], path2[j]));
+        {
+            dp[0, j] = dp[0, j - 1] + Vector3.Distance(path1[0], path2[j]);
+        }
 
+        // 나머지 DP 테이블 채우기
         for (int i = 1; i < n; i++)
         {
             for (int j = 1; j < m; j++)
             {
                 float cost = Vector3.Distance(path1[i], path2[j]);
                 dp[i, j] = Mathf.Min(
-                    Mathf.Max(dp[i - 1, j], cost),
-                    Mathf.Min(
-                        Mathf.Max(dp[i, j - 1], cost),
-                        Mathf.Max(dp[i - 1, j - 1], cost)
-                    )
-                );
+                    Mathf.Min(dp[i - 1, j], dp[i, j - 1]),
+                    dp[i - 1, j - 1]
+                ) + cost;
             }
         }
 
