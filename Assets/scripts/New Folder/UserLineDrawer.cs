@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿// UserLineDrawer.cs
+using UnityEngine;
 using System.Collections.Generic;
 
 public class UserLineDrawer : MonoBehaviour
@@ -6,6 +7,7 @@ public class UserLineDrawer : MonoBehaviour
     public Material lineMaterial;          // 사용자 라인 머티리얼
     public float minDistance = 0.1f;       // 점 사이 최소 거리
     public float lineWidth = 0.1f;         // 라인 두께
+    private List<float> drawnTimes = new List<float>(); // DTW 각 점의 시간 기록
 
     private List<Vector3> drawnPoints = new List<Vector3>();
     private LineRenderer currentLine;
@@ -49,7 +51,7 @@ public class UserLineDrawer : MonoBehaviour
             foreach (var lr in allLines)
             {
                 if (lr.gameObject.name == "UserDrawnLine") continue;
-
+                
                 laneMatcher.colorLaneManager.colorLanes.Add(lr);
 
                 // 고정 색상 및 shortcutName 설정
@@ -98,6 +100,7 @@ public class UserLineDrawer : MonoBehaviour
     void StartDrawing()
     {
         drawnPoints.Clear();
+        drawnTimes.Clear(); // DTW 시간도 초기화
         currentLine.positionCount = 0;
         isDrawing = true;
     }
@@ -108,9 +111,14 @@ public class UserLineDrawer : MonoBehaviour
         if (drawnPoints.Count == 0 || Vector3.Distance(drawnPoints[drawnPoints.Count - 1], point) >= minDistance)
         {
             drawnPoints.Add(point);
+            drawnTimes.Add(Time.time); //DTW 시간 기록
             currentLine.positionCount = drawnPoints.Count;
             currentLine.SetPosition(drawnPoints.Count - 1, point);
         }
+    }
+    public List<float> GetDrawnTimes() // DTW 시간 리스트 반환
+    {
+        return drawnTimes;
     }
 
     void EndDrawing()
