@@ -3659,6 +3659,8 @@ MonoBehaviour:
   colorLaneManager: {fileID: 1684565642}
   userLineDrawer: {fileID: 797675012}
   matchThreshold: 2.5
+  minMatchAccuracy: 0
+  runTestOnStart: 1
 --- !u!4 &1787578043
 Transform:
   m_ObjectHideFlags: 0

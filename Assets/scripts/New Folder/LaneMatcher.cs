@@ -49,8 +49,8 @@ public class LaneMatcher : MonoBehaviour
         int bestMatchIndex = -1;
 
         // 프레셰:0.7, DTW:0.3 가중치 (인스펙터에서 조절 가능)
-        float frechetWeight = 0.8f;
-        float dtwWeight = 0.2f;
+        float frechetWeight = 0.6f;
+        float dtwWeight = 0.4f;
 
         for (int i = 0; i < colorLanesPoints.Count; i++)
         {
