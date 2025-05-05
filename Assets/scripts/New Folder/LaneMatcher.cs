@@ -2,6 +2,7 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 public class LaneMatcher : MonoBehaviour
 {
@@ -10,11 +11,26 @@ public class LaneMatcher : MonoBehaviour
     public float matchThreshold = 2.5f; // 🎯 프레셰 거리 임계값
     [Range(0f, 100f)]
     public float minMatchAccuracy = 50f; // 🎯 Inspector에서 설정할 수 있는 정확도 기준 (기본 50%)
+    private List<float> NormalizeTimeSeries(List<float> times)
+    {
+        if (times == null || times.Count < 2)
+            return new List<float>();
+
+        float min = times.Min();
+        float max = times.Max();
+        float range = max - min;
+
+        // 0으로 나누기 방지
+        if (range == 0) range = 1;
+
+        return times.Select(t => (t - min) / range).ToList();
+    }
 
     public void CompareAndFindClosestLane()
     {
         List<Vector2> userPoints2D = userLineDrawer.GetDrawnPoints2D();
         List<float> userTimes = userLineDrawer.GetDrawnTimes();
+        List<float> normalizedUser = NormalizeTimeSeries(userTimes);
 
         if (userPoints2D.Count < 2)
         {
@@ -28,13 +44,13 @@ public class LaneMatcher : MonoBehaviour
             Debug.LogWarning("Color Lane 리스트가 비어 있습니다.");
             return;
         }
-
+        
         float minCombinedScore = float.MaxValue;
         int bestMatchIndex = -1;
 
         // 프레셰:0.7, DTW:0.3 가중치 (인스펙터에서 조절 가능)
-        float frechetWeight = 0.7f;
-        float dtwWeight = 0.3f;
+        float frechetWeight = 0.8f;
+        float dtwWeight = 0.2f;
 
         for (int i = 0; i < colorLanesPoints.Count; i++)
         {
@@ -44,9 +60,9 @@ public class LaneMatcher : MonoBehaviour
             // 2. DTW 거리 계산 (시간 유사도)
             var info = colorLaneManager.colorLanes[i].GetComponent<ColorLaneInfo>();
             List<float> refTimes = info?.referenceTimes ?? new List<float>();
-            float dtwDist = refTimes.Count > 0 ?
-                DTWCalculator.CalculateDTW(userTimes, refTimes) :
-                Mathf.Infinity; // 기준 시간 없으면 무한대 처리
+            List<float> normalizedRef = NormalizeTimeSeries(refTimes);
+            Debug.Log($"사용자 시간 데이터 개수: {userTimes.Count}, 기준 시간 데이터 개수: {refTimes.Count}");
+            float dtwDist = DTWCalculator.CalculateDTW(normalizedUser, normalizedRef);
 
             // 3. 종합 점수 계산
             float combinedScore = (frechetDist * frechetWeight) + (dtwDist * dtwWeight);
@@ -100,5 +116,20 @@ public class LaneMatcher : MonoBehaviour
         line.endColor = originalColor;
         line.material.color = originalColor;
     }
+    [Header("테스트 설정")]
+    public bool runTestOnStart = true;
 
+    private void Start() // DTW 실행
+    {
+        if (runTestOnStart)
+            TestDTW();
+    }
+    void TestDTW() // DTW 테스트
+    {
+        List<float> testA = new List<float> { 0f, 0.5f, 1f };
+        List<float> testB = new List<float> { 0f, 1f, 2f };
+
+        float dtw = DTWCalculator.CalculateDTW(testA, testB);
+        Debug.Log($"테스트 DTW: {dtw} (기대값: 1.0)");
+    }
 }

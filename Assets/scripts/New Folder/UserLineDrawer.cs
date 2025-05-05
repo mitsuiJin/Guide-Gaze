@@ -68,12 +68,18 @@ public class UserLineDrawer : MonoBehaviour
                     {
                         info = lr.gameObject.AddComponent<ColorLaneInfo>();
                     }
-
+                    info.referenceTimes.Clear();
+                    for (int j = 0; j < lr.positionCount; j++)
+                    {
+                        info.referenceTimes.Add(j * 0.1f); // DTW 0.5에서 0.1로 실제 그린 시간 기반으로 변경
+                    }
                     // "LineTo_Ctrl+S" 형태에서 "Ctrl+S"만 추출
                     string rawName = lr.gameObject.name;
                     string[] split = rawName.Split('_');
                     string shortcut = split.Length > 1 ? split[1] : rawName;
                     info.shortcutName = shortcut;
+
+                    
 
                     colorIndex++;
                 }
