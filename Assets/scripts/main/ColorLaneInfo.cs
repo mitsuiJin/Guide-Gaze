@@ -1,3 +1,4 @@
+// ColorLaneInfo.cs
 using UnityEngine;
 
 public class ColorLaneInfo : MonoBehaviour
