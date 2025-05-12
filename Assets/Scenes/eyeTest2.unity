@@ -1058,14 +1058,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 20192aa1b3ec94f4b9b2f9c9a92121bc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  startPoint: {fileID: 467592207}
-  targetPoints:
+  ctrlKeyCenter: {fileID: 467592207}
+  targetKeys:
+  - {fileID: 160199751}
+  - {fileID: 637829698}
   - {fileID: 1036450727}
   - {fileID: 1684913615}
-  - {fileID: 213732166}
   lineMaterialTemplate: {fileID: 2100000, guid: cc57a41ef8250ed46b087565d2e92829, type: 2}
-  curveResolution: 100
-  baseCurveOffset: {x: 0, y: 3}
+  curveResolution: 30
+  baseCurveHeight: 1
+  extraCurveHeight: 4
 --- !u!1 &467592205
 GameObject:
   m_ObjectHideFlags: 0
