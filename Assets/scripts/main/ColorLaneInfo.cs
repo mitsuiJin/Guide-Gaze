@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// 라인 렌더러의 포인트 정보를 저장하고, 하이라이트 기능을 제공
+/// </summary>
 public class ColorLaneInfo : MonoBehaviour
 {
     public List<Vector3> positions = new List<Vector3>();
@@ -31,7 +34,7 @@ public class ColorLaneInfo : MonoBehaviour
     {
         float originalWidth = lineRenderer.widthMultiplier;
 
-        for (int i = 0; i < 3; i++) // 🔁 3번 깜빡이기
+        for (int i = 0; i < 3; i++)
         {
             lineRenderer.widthMultiplier = originalWidth * 2f;
             yield return new WaitForSeconds(0.2f);

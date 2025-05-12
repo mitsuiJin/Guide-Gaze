@@ -1060,12 +1060,37 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startPoint: {fileID: 467592207}
   targetPoints:
+  - {fileID: 160199751}
+  - {fileID: 637829698}
   - {fileID: 1036450727}
   - {fileID: 1684913615}
+  - {fileID: 1689210594}
   - {fileID: 213732166}
+  - {fileID: 498425798}
+  - {fileID: 1926497961}
   lineMaterialTemplate: {fileID: 2100000, guid: cc57a41ef8250ed46b087565d2e92829, type: 2}
   curveResolution: 100
-  baseCurveOffset: {x: 0, y: 3}
+  waveCircles:
+  - center: {x: -4.93, y: -2.53}
+    radius: 1
+    curveStrength: 0.5
+    angle: -30
+  - center: {x: -4.93, y: -2.53}
+    radius: 2
+    curveStrength: 0.5
+    angle: 30
+  - center: {x: -4.93, y: -2.53}
+    radius: 3
+    curveStrength: 0.5
+    angle: -30
+  - center: {x: -4.93, y: -2.53}
+    radius: 4
+    curveStrength: 0.5
+    angle: 30
+  - center: {x: -4.93, y: -2.53}
+    radius: 5
+    curveStrength: 0.5
+    angle: -30
 --- !u!1 &467592205
 GameObject:
   m_ObjectHideFlags: 0
@@ -1520,8 +1545,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 637829696}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.079999685, y: -0.5699998, z: 0}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.079999804, y: -0.5699998, z: 0}
   m_LocalScale: {x: 0.05, y: 0.05, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4023,7 +4048,6 @@ Transform:
   - {fileID: 237624851}
   - {fileID: 213732166}
   - {fileID: 160199751}
-  - {fileID: 637829698}
   - {fileID: 1592029941}
   - {fileID: 2111644245}
   - {fileID: 791246932}
@@ -4036,6 +4060,7 @@ Transform:
   - {fileID: 1689210594}
   - {fileID: 1926497961}
   - {fileID: 498425798}
+  - {fileID: 637829698}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2111644243
