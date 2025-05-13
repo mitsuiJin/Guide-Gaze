@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿// MultiLineRendererGenerator.cs
+using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>

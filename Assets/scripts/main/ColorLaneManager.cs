@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿// ColorLaneManager.cs
+
+using System.Collections.Generic;
 using UnityEngine;
 
 public class ColorLaneManager : MonoBehaviour
