@@ -1,29 +1,70 @@
+ï»¿// SquareMoverManager.cs
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// °¢ ¼±¸¶´Ù ¼­·Î ´Ù¸¥ ¼Óµµ·Î ³×¸ğ°¡ ÀÌµ¿ÇÏµµ·Ï ÇÏ´Â ¸Å´ÏÀú.
-/// </summary>
 public class SquareMoverManager : MonoBehaviour
 {
-    [Tooltip("³×¸ğ µµÇü¿¡ »ç¿ëÇÒ Sprite (¿¹: Square, Quad µî)")]
-    public Sprite squareSprite;
-
-    [Tooltip("µµÇüÀÇ »ö»ó(¶óÀÎ »ö»ó°ú µ¿ÀÏÇÏ°Ô ¸ÂÃß·Á¸é true)")]
-    public bool matchLineColor = true;
-
-    [Tooltip("¶óÀÎ ±½±â ´ëºñ µµÇü Å©±â °è¼ö (1.5 = 1.5¹è)")]
-    public float sizeMultiplier = 1.5f;
-
-    [Tooltip("°¢ ¼±º° ÀÌµ¿ ½Ã°£(ÃÊ). ¼± °³¼ö¿Í ¹è¿­ ±æÀÌ°¡ °°¾Æ¾ß ÇÔ!")]
-    public float[] moveDurations;
+    public Sprite squareSprite;  // ì‹œê°í™” ê°ì²´ì˜ ìŠ¤í”„ë¼ì´íŠ¸
+    public bool matchLineColor = true;  // ë¼ì¸ ìƒ‰ìƒ ì¼ì¹˜ ì—¬ë¶€
+    public float sizeMultiplier = 1.5f;  // í¬ê¸° ì¡°ì • ë°°ìœ¨
+    public float[] moveSpeeds;  // ê° Laneì— ëŒ€í•œ ì´ë™ ì†ë„ ë°°ì—´
 
     private List<Coroutine> moveCoroutines = new List<Coroutine>();
 
     private void Start()
     {
         StartCoroutine(WaitAndCreateSquares());
+    }
+
+    // ê²½ë¡œì˜ í‰ê·  ì†ë„ ê³„ì‚° í•¨ìˆ˜ (ì‹œê°í™” ê°ì²´ì˜ ì´ë™ ì†ë„ ê³„ì‚°)
+    private float CalculateObjectSpeed(List<Vector3> path, float moveDuration)
+    {
+        if (path == null || path.Count < 2)
+            return 0f;
+
+        // ê²½ë¡œì˜ ì „ì²´ ê¸¸ì´ ê³„ì‚°
+        float totalDistance = 0f;
+        for (int i = 1; i < path.Count; i++)
+        {
+            totalDistance += Vector3.Distance(path[i - 1], path[i]);
+        }
+
+        // ì´ë™ ì‹œê°„ì„ ì´ìš©í•˜ì—¬ ì†ë„ ê³„ì‚° (ì†ë„ = ê±°ë¦¬ / ì‹œê°„)
+        return totalDistance / moveDuration;  // ì†ë„ ê³„ì‚° (ë‹¨ìœ„: ìœ ë‹›/ì´ˆ)
+    }
+
+    // Tracking Lane (ì‹œì„  ì¶”ì  ê²½ë¡œ)ì˜ ì†ë„ ê³„ì‚°
+    private float CalculatePathSpeed(List<Vector3> path)
+    {
+        float totalDistance = 0f;
+        float totalTime = path.Count;  // ì˜ˆì‹œ: 1ì´ˆ ê°„ê²©ìœ¼ë¡œ ìƒ˜í”Œë§ëœ ê²ƒìœ¼ë¡œ ê°€ì •
+
+        for (int i = 1; i < path.Count; i++)
+        {
+            totalDistance += Vector3.Distance(path[i - 1], path[i]);
+        }
+
+        return totalTime > 0 ? totalDistance / totalTime : 0f;  // ì†ë„ ê³„ì‚° (ë‹¨ìœ„: ìœ ë‹›/ì´ˆ)
+    }
+
+    // ì†ë„ ìœ ì‚¬ë„ ê³„ì‚° í•¨ìˆ˜
+    public float CalculateSpeedSimilarity(List<Vector3> gazePath, List<Vector3> lanePath)
+    {
+        // 1. ì‹œì„  ê²½ë¡œì˜ ì†ë„ ê³„ì‚°
+        float trackingLaneSpeed = CalculatePathSpeed(gazePath);
+
+        // 2. Color Laneì˜ ì‹œê°í™” ê°ì²´ ì†ë„ ê³„ì‚°
+        float laneSpeed = CalculateObjectSpeed(lanePath, moveSpeeds[0]);  // ì˜ˆì‹œ: moveSpeeds[0]ì„ ì†ë„ë¡œ ì‚¬ìš©
+
+        // 3. ì†ë„ ì°¨ì´ë¥¼ ë¹„ìœ¨ë¡œ ê³„ì‚° (ë‘ ê°’ì´ ë¹„ìŠ·í•˜ë©´ 1ì— ê°€ê¹Œì›€)
+        float speedDifference = Mathf.Abs(laneSpeed - trackingLaneSpeed) / Mathf.Max(laneSpeed, trackingLaneSpeed);
+
+        // 4. ì°¨ì´ê°€ í¬ë©´ ìœ ì‚¬ë„ê°€ ë‚®ê³ , ì°¨ì´ê°€ ì‘ìœ¼ë©´ ìœ ì‚¬ë„ê°€ ë†’ë„ë¡ ì„¤ì •
+        float similarity = Mathf.Exp(-speedDifference);  // 1ì— ê°€ê¹Œìš¸ìˆ˜ë¡ ìœ ì‚¬ë„ê°€ ë†’ìŒ
+
+        return similarity;
     }
 
     IEnumerator WaitAndCreateSquares()
@@ -36,27 +77,28 @@ public class SquareMoverManager : MonoBehaviour
         }
 
         var lanes = ColorLaneManager.Instance.GetAllColorLanes();
-        Debug.Log($"[SquareMoverManager] °î¼± °³¼ö: {lanes.Count}");
-
-        // ¹è¿­ ±æÀÌ Ã¼Å©
-        if (moveDurations == null || moveDurations.Length != lanes.Count)
+        if (moveSpeeds == null || moveSpeeds.Length != lanes.Count)
         {
-            Debug.LogWarning("[SquareMoverManager] moveDurations ¹è¿­ ±æÀÌ°¡ °î¼± °³¼ö¿Í ´Ù¸¨´Ï´Ù. ±âº»°ª(5ÃÊ)À¸·Î Ã¤¿ó´Ï´Ù.");
-            // ¹è¿­ ±æÀÌ ¸ÂÃß±â
-            moveDurations = new float[lanes.Count];
+            moveSpeeds = new float[lanes.Count];
             for (int i = 0; i < lanes.Count; i++)
-                moveDurations[i] = 5f;
+                moveSpeeds[i] = 1f;  // ê¸°ë³¸ ì†ë„ 1fë¡œ ì„¤ì •
         }
 
+        // ê° color laneì— ëŒ€í•´ ì‹œê°í™” ê°ì²´ë¥¼ ìƒì„±í•˜ê³  ì´ë™ì‹œí‚¤ê¸°
         for (int i = 0; i < lanes.Count; i++)
         {
             var lane = lanes[i];
-            float duration = moveDurations[i];
-            Debug.Log($"[SquareMoverManager] ³×¸ğ »ı¼º ½Ãµµ: {lane.name}, ¼Óµµ: {duration}ÃÊ");
+            float speed = moveSpeeds[i];  // í˜„ì¬ laneì— ëŒ€í•œ ì´ë™ ì†ë„
+
+            // ì „ì²´ ê³¡ì„  ê¸¸ì´ ì¸¡ì •
+            float totalLength = GetPathLength(lane.positions);
+            float duration = totalLength / speed;  // ì†ë„ì— ë§ì¶° ì´ë™ ì‹œê°„ ê³„ì‚°
+
             CreateAndMoveSquare(lane, duration);
         }
     }
 
+    // ì‹œê°í™” ê°ì²´ ìƒì„± ë° ì´ë™ í•¨ìˆ˜
     void CreateAndMoveSquare(ColorLaneInfo lane, float duration)
     {
         GameObject squareObj = new GameObject("MovingSquare_" + lane.name);
@@ -64,9 +106,7 @@ public class SquareMoverManager : MonoBehaviour
 
         var sr = squareObj.AddComponent<SpriteRenderer>();
         sr.sprite = squareSprite;
-
-        float lineWidth = lane.lineRenderer.widthMultiplier;
-        float size = lineWidth * sizeMultiplier;
+        float size = lane.lineRenderer.widthMultiplier * sizeMultiplier;
         squareObj.transform.localScale = new Vector3(size, size, 1f);
 
         if (matchLineColor)
@@ -75,16 +115,15 @@ public class SquareMoverManager : MonoBehaviour
         if (lane.positions != null && lane.positions.Count > 0)
         {
             Vector3 startPos = lane.positions[0];
-            startPos.z = 0f;
             squareObj.transform.position = startPos;
         }
 
-        Debug.Log($"[SquareMoverManager] ³×¸ğ »ı¼º: {squareObj.name}, À§Ä¡: {squareObj.transform.position}");
-
+        // ì‹œê°í™” ê°ì²´ ì´ë™ ë£¨í‹´ ì‹œì‘
         Coroutine moveRoutine = StartCoroutine(MoveSquareLoop(squareObj.transform, lane.positions, duration));
         moveCoroutines.Add(moveRoutine);
     }
 
+    // ì‹œê°í™” ê°ì²´ë¥¼ ê²½ë¡œë¥¼ ë”°ë¼ ì´ë™ì‹œí‚¤ëŠ” ì½”ë£¨í‹´
     IEnumerator MoveSquareLoop(Transform square, List<Vector3> path, float duration)
     {
         int count = path.Count;
@@ -103,12 +142,22 @@ public class SquareMoverManager : MonoBehaviour
                 float lerpT = ft - idx;
 
                 Vector3 pos = Vector3.Lerp(path[idx], path[nextIdx], lerpT);
-                pos.z = 0f;
                 square.position = pos;
 
                 t += Time.deltaTime / duration;
                 yield return null;
             }
         }
+    }
+
+    // ê²½ë¡œì˜ ê¸¸ì´ ê³„ì‚°
+    float GetPathLength(List<Vector3> path)
+    {
+        float length = 0f;
+        for (int i = 1; i < path.Count; i++)
+        {
+            length += Vector3.Distance(path[i - 1], path[i]);
+        }
+        return length;
     }
 }

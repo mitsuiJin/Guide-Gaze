@@ -509,11 +509,11 @@ MonoBehaviour:
   squareSprite: {fileID: 7482667652216324306, guid: 230aca031f96c3945be7fb08843d7062, type: 3}
   matchLineColor: 1
   sizeMultiplier: 3
-  moveDurations:
+  moveSpeeds:
   - 1
+  - 2
   - 3
   - 4
-  - 6
 --- !u!4 &180940682
 Transform:
   m_ObjectHideFlags: 0
