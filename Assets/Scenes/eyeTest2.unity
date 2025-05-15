@@ -3847,6 +3847,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gazeLineDrawer: {fileID: 1176831113}
+  squareMoverManager: {fileID: 180940681}
 --- !u!4 &1787578043
 Transform:
   m_ObjectHideFlags: 0

@@ -15,6 +15,9 @@ public class ColorLaneInfo : MonoBehaviour
         lineRenderer = GetComponent<LineRenderer>();
     }
 
+    /// <summary>
+    /// 라인을 깜빡이며 하이라이트 처리 (3회 반복)
+    /// </summary>
     public void Highlight(bool isOn)
     {
         if (lineRenderer == null) return;
@@ -32,7 +35,7 @@ public class ColorLaneInfo : MonoBehaviour
     {
         float originalWidth = lineRenderer.widthMultiplier;
 
-        for (int i = 0; i < 3; i++) // 🔁 3번 깜빡이기
+        for (int i = 0; i < 3; i++)
         {
             lineRenderer.widthMultiplier = originalWidth * 2f;
             yield return new WaitForSeconds(0.2f);
@@ -41,6 +44,9 @@ public class ColorLaneInfo : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 이 Color Lane의 경로 좌표 반환
+    /// </summary>
     public List<Vector3> GetWorldPoints()
     {
         return positions;
