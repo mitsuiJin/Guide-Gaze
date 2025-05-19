@@ -40,25 +40,35 @@ public class SquareMoverManager : MonoBehaviour
         }
 
         var lanes = ColorLaneManager.Instance.GetAllColorLanes();
+        int count = lanes.Count;
+        moveSpeeds = new float[count];
 
-        if (moveSpeeds == null || moveSpeeds.Length != lanes.Count)
-        {
-            moveSpeeds = new float[lanes.Count];
-            for (int i = 0; i < lanes.Count; i++)
-                moveSpeeds[i] = 1f + 0.5f * i;  // 예: 1.0, 1.5, 2.0, 2.5 등 고정 설정
-        }
+        //const float MIN_SPEED = 2.7f;
+        //const float MAX_SPEED = 7.2f;
 
-        for (int i = 0; i < lanes.Count; i++)
+        // N개 속도를 균등 분포로 생성
+        float[] assignedSpeeds = new float[4]
+         {
+            5.5f, // 느림 (예: Z)
+            3.0f, // 중간 (예: X)
+            6.5f, // 빠름 (예: C)
+            2.5f  // 가장 빠름 (예: V) → 이 이상은 피하는 게 좋음
+         };
+
+        for (int i = 0; i < count; i++)
         {
             var lane = lanes[i];
-            float speed = moveSpeeds[i];
+            float length = GetPathLength(lane.positions);
+            float speed = assignedSpeeds[i];
+            float duration = length / speed;
 
-            float totalLength = GetPathLength(lane.positions);
-            float duration = totalLength / speed;
-
+            moveSpeeds[i] = speed;
             CreateAndMoveSquare(lane, duration);
+
+            Debug.Log($"[Lane {i}] 길이={length:F2}, 속도={speed:F2}, 도달시간={duration:F2}");
         }
     }
+
 
     private void CreateAndMoveSquare(ColorLaneInfo lane, float duration)
     {

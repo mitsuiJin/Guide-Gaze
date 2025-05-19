@@ -202,7 +202,7 @@ Transform:
   m_GameObject: {fileID: 160199749}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1.8099997, y: -0.5699998, z: 0}
+  m_LocalPosition: {x: -1.92, y: -0.54, z: 0}
   m_LocalScale: {x: 0.05, y: 0.05, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -509,11 +509,7 @@ MonoBehaviour:
   squareSprite: {fileID: 7482667652216324306, guid: 230aca031f96c3945be7fb08843d7062, type: 3}
   matchLineColor: 1
   sizeMultiplier: 3
-  moveSpeeds:
-  - 1
-  - 2
-  - 3
-  - 4
+  moveSpeeds: []
 --- !u!4 &180940682
 Transform:
   m_ObjectHideFlags: 0
@@ -1117,9 +1113,9 @@ MonoBehaviour:
   - {fileID: 1036450727}
   - {fileID: 1684913615}
   lineMaterialTemplate: {fileID: 2100000, guid: cc57a41ef8250ed46b087565d2e92829, type: 2}
-  curveResolution: 30
+  curveResolution: 100
   baseCurveHeight: 1
-  extraCurveHeight: 4
+  extraCurveHeight: 3
 --- !u!1 &467592205
 GameObject:
   m_ObjectHideFlags: 0
@@ -1575,7 +1571,7 @@ Transform:
   m_GameObject: {fileID: 637829696}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.079999685, y: -0.5699998, z: 0}
+  m_LocalPosition: {x: -0.18, y: -0.49, z: 0}
   m_LocalScale: {x: 0.05, y: 0.05, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
