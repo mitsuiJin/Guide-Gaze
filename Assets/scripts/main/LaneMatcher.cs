@@ -91,7 +91,7 @@ public class LaneMatcher : MonoBehaviour
         {
             totalDist += Vector3.Distance(path[i - 1], path[i]);
         }
-        float totalTime = timestamps[^1] - timestamps[0];
+        float totalTime = timestamps[^1] - timestamps[0]; // ^1은 마지막 시간, 0은 첫 시간
         return totalTime > 0 ? totalDist / totalTime : 0f;
     }
 

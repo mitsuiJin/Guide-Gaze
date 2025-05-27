@@ -1,78 +1,101 @@
-﻿// MultiLineRendererGenerator.cs
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 
-/// <summary>
-/// 커맨드 키(Ctrl)에서 Z/X/C/V 키로 향하는 곡선을 생성하는 전용 스크립트 (시각화 객체와의 충돌 방지를 위한 설계)
-/// </summary>
 public class MultiLineRendererGenerator : MonoBehaviour
 {
-    public Transform ctrlKeyCenter;                  // 커맨드 키 (예: Ctrl) 중심 위치
-    public List<Transform> targetKeys;               // 타겟 키 리스트: Z, X, C, V (순서 고정)
-    public Material lineMaterialTemplate;            // 라인 머티리얼 템플릿
-    public int curveResolution = 20;                 // 곡선 포인트 수
-    public float baseCurveHeight = 1.0f;             // 기본 곡선 높이 계수
-    public float extraCurveHeight = 0.6f;            // index 2, 3에 추가 곡률 적용치
+    public Transform ctrlKeyCenter;
+    public List<Transform> targetKeys;
+    public Material lineMaterialTemplate;
+    public int curveResolution = 20;
+    public float startOffset = 0.3f;
+    public float heightFactor = 0.3f;
+
+    private enum CtrlSide { Left, Top, Right, Bottom }
+
+    private class LaneData
+    {
+        public int index;
+        public Transform target;
+        public CtrlSide side;
+        public Vector2 start;
+        public Vector2 end;
+        public Vector2 control;
+        public bool isUpward;
+    }
 
     void Start()
     {
-        for (int i = 0; i < targetKeys.Count; i++)
+        if (targetKeys.Count != 4)
         {
-            bool isUpward = (i == 0 || i == 2); // Z, C는 위로 볼록
-            Vector2 ctrlAnchor = GetCtrlAnchor(i);
-            CreateParabolicCurve(ctrlAnchor, targetKeys[i].position, isUpward, i);
+            Debug.LogError("targetKeys는 4개여야 합니다.");
+            return;
+        }
+
+        Vector2 ctrl = ctrlKeyCenter.position;
+
+        // 상대 위치 계산
+        var keyInfos = targetKeys.Select((t, i) => new
+        {
+            index = i,
+            tf = t,
+            local = (Vector2)t.position - ctrl,
+            world = (Vector2)t.position
+        }).ToList();
+
+        // 위로 볼록 그룹: -x - y 값 기준 정렬 (Top, Left)
+        var upwardSorted = keyInfos.OrderByDescending(k => -k.local.x - k.local.y).Take(2).ToList();
+        var downwardSorted = keyInfos.Except(upwardSorted).OrderByDescending(k => k.local.x + k.local.y).Take(2).ToList();
+
+        var lanes = new List<LaneData>();
+
+        if (upwardSorted.Count == 2)
+        {
+            lanes.Add(new LaneData { index = upwardSorted[0].index, target = upwardSorted[0].tf, side = CtrlSide.Top, isUpward = true });
+            lanes.Add(new LaneData { index = upwardSorted[1].index, target = upwardSorted[1].tf, side = CtrlSide.Left, isUpward = true });
+        }
+
+        if (downwardSorted.Count == 2)
+        {
+            lanes.Add(new LaneData { index = downwardSorted[0].index, target = downwardSorted[0].tf, side = CtrlSide.Bottom, isUpward = false });
+            lanes.Add(new LaneData { index = downwardSorted[1].index, target = downwardSorted[1].tf, side = CtrlSide.Right, isUpward = false });
+        }
+
+        foreach (var lane in lanes)
+        {
+            lane.start = GetStartPoint(ctrl, lane.side);
+            lane.end = lane.target.position;
+            lane.control = CalculateControlPoint(lane.start, lane.end, lane.isUpward, heightFactor);
+
+            DrawQuadraticBezier(lane.index, lane.start, lane.control, lane.end, lane.target.name);
         }
     }
 
-    /// <summary>
-    /// Ctrl 키에서 출발하는 위치를 z/x/c/v에 따라 상/우/하/좌로 분리하여 지정
-    /// </summary>
-    Vector2 GetCtrlAnchor(int index)
+    Vector2 GetStartPoint(Vector2 center, CtrlSide side)
     {
-        Vector2 basePos = new Vector2(ctrlKeyCenter.position.x, ctrlKeyCenter.position.y);
-        float offset = 0.3f;
-
-        return index switch
+        return side switch
         {
-            0 => basePos + Vector2.up * offset,     // Z: 위쪽
-            1 => basePos + Vector2.right * offset,  // X: 오른쪽
-            2 => basePos + Vector2.left * offset,   // C: 왼쪽
-            3 => basePos + Vector2.down * offset,   // V: 아래쪽
-            _ => basePos
+            CtrlSide.Left => center + Vector2.left * startOffset,
+            CtrlSide.Top => center + Vector2.up * startOffset,
+            CtrlSide.Right => center + Vector2.right * startOffset,
+            CtrlSide.Bottom => center + Vector2.down * startOffset,
+            _ => center
         };
     }
 
-    /// <summary>
-    /// 2차 곡선을 따라 Color Lane을 생성 (볼록 방향에 따라 제어점 위치 조정)
-    /// </summary>
-    void CreateParabolicCurve(Vector2 start, Vector3 target3D, bool isUpward, int index)
+    Vector2 CalculateControlPoint(Vector2 start, Vector2 end, bool isUpward, float height)
     {
-        Vector2 end = new Vector2(target3D.x, target3D.y);
-        Vector2 control;
+        Vector2 mid = Vector2.Lerp(start, end, isUpward ? 0.4f : 0.35f);
+        Vector2 dir = (end - start).normalized;
+        Vector2 normal = new Vector2(-dir.y, dir.x);
+        Vector2 convex = isUpward ? Vector2.up : Vector2.down;
+        float align = Mathf.Sign(Vector2.Dot(normal, convex));
+        return mid + normal * align * Vector2.Distance(start, end) * height;
+    }
 
-        float height = baseCurveHeight + ((index >= 2) ? extraCurveHeight : 0f);
-
-        if (index == 2)
-        {
-            // C: 꺾이는 포인트를 왼쪽으로, 시작점과 가까운 위치로 설정
-            Vector2 midShort = Vector2.Lerp(start, end, 0.4f);
-            control = midShort + (Vector2.left + Vector2.up).normalized * height;
-        }
-        else if (index == 3)
-        {
-            // V: 꺾이는 포인트를 아래쪽으로, 시작점과 가까운 위치로 설정
-            Vector2 midShort = Vector2.Lerp(start, end, 0.3f);
-            control = midShort + (Vector2.down + Vector2.right).normalized * height;
-        }
-        else
-        {
-            // Z, X 기본 처리
-            Vector2 mid = (start + end) * 0.5f;
-            Vector2 offsetDir = new Vector2(-(end.y - start.y), end.x - start.x).normalized;
-            control = mid + offsetDir * (isUpward ? height : -height);
-        }
-
-        GameObject lineObj = new GameObject("ParabolaTo_" + targetKeys[index].name);
+    void DrawQuadraticBezier(int index, Vector2 start, Vector2 control, Vector2 end, string label)
+    {
+        GameObject lineObj = new GameObject("Curve_" + label);
         lineObj.transform.parent = this.transform;
 
         LineRenderer lr = lineObj.AddComponent<LineRenderer>();
@@ -81,14 +104,7 @@ public class MultiLineRendererGenerator : MonoBehaviour
         lr.widthMultiplier = 0.1f;
 
         Material mat = new Material(lineMaterialTemplate);
-        Color color = index switch
-        {
-            0 => Color.red,       // Z
-            1 => Color.green,     // X
-            2 => Color.blue,      // C
-            3 => Color.yellow,    // V
-            _ => Color.white
-        };
+        Color color = Color.HSVToRGB(index / 4f, 1f, 1f);
         mat.color = color;
         lr.material = mat;
         lr.startColor = lr.endColor = color;
@@ -99,17 +115,10 @@ public class MultiLineRendererGenerator : MonoBehaviour
         for (int i = 0; i < curveResolution; i++)
         {
             float t = i / (float)(curveResolution - 1);
-            Vector2 point = QuadraticBezier(start, control, end, t);
-            Vector3 point3D = new Vector3(point.x, point.y, 0f);
-            lr.SetPosition(i, point3D);
-            cli.positions.Add(point3D);
+            Vector2 pt = Mathf.Pow(1 - t, 2) * start + 2 * (1 - t) * t * control + Mathf.Pow(t, 2) * end;
+            Vector3 pt3 = new Vector3(pt.x, pt.y, 0f);
+            lr.SetPosition(i, pt3);
+            cli.positions.Add(pt3);
         }
     }
-
-    Vector2 QuadraticBezier(Vector2 p0, Vector2 p1, Vector2 p2, float t)
-    {
-        return Mathf.Pow(1 - t, 2) * p0 + 2 * (1 - t) * t * p1 + Mathf.Pow(t, 2) * p2;
-    }
-
-    // 랜덤 컬러 제거됨: 고정 색상 사용으로 대체
 }

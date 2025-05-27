@@ -49,10 +49,10 @@ public class SquareMoverManager : MonoBehaviour
         // N개 속도를 균등 분포로 생성
         float[] assignedSpeeds = new float[4]
          {
-            5.5f, // 느림 (예: Z)
+            2.5f, // 느림 (예: Z)
             3.0f, // 중간 (예: X)
-            6.5f, // 빠름 (예: C)
-            2.5f  // 가장 빠름 (예: V) → 이 이상은 피하는 게 좋음
+            3.5f, // 빠름 (예: C)
+            4.0f  // 가장 빠름 (예: V) → 이 이상은 피하는 게 좋음
          };
 
         for (int i = 0; i < count; i++)
