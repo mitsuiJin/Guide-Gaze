@@ -42,7 +42,7 @@ public class LaneMatcher : MonoBehaviour
         }
 
         List<ColorLaneInfo> colorLanes = ColorLaneManager.Instance.GetAllColorLanes();
-        float[] objectSpeeds = squareMoverManager.moveSpeeds;
+        float[] objectSpeeds = squareMoverManager.currentLaneSpeeds;
 
         if (colorLanes == null || colorLanes.Count == 0 || objectSpeeds == null || objectSpeeds.Length != colorLanes.Count)
         {

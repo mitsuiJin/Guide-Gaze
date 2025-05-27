@@ -509,7 +509,12 @@ MonoBehaviour:
   squareSprite: {fileID: 7482667652216324306, guid: 230aca031f96c3945be7fb08843d7062, type: 3}
   matchLineColor: 1
   sizeMultiplier: 3
-  moveSpeeds: []
+  currentLaneSpeeds: []
+  predefinedSpeeds:
+  - 2.5
+  - 3
+  - 3.5
+  - 4
 --- !u!4 &180940682
 Transform:
   m_ObjectHideFlags: 0
@@ -1107,7 +1112,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ctrlKeyCenter: {fileID: 467592207}
-  targetKeys:
+  allAvailableKeys:
+  - {fileID: 1552573102}
+  - {fileID: 1120730205}
+  - {fileID: 285159903}
+  - {fileID: 662901144}
+  - {fileID: 1689210594}
+  - {fileID: 213732166}
+  - {fileID: 1926497961}
+  - {fileID: 498425798}
   - {fileID: 160199751}
   - {fileID: 637829698}
   - {fileID: 1036450727}
@@ -1115,7 +1128,25 @@ MonoBehaviour:
   lineMaterialTemplate: {fileID: 2100000, guid: cc57a41ef8250ed46b087565d2e92829, type: 2}
   curveResolution: 50
   startOffset: 0.5
-  heightFactor: 0.3
+  innerCurveHeightFactor: 0.25
+  outerCurveHeightFactor: 0.5
+  neighborSqueezeAngleThreshold: 75
+  neighborSqueezeHeightFactorMultiplier: 0.6
+  minMaxHeightFactorClamp: {x: 0.1, y: 0.7}
+  targetKeys:
+  - {fileID: 1552573102}
+  - {fileID: 1120730205}
+  - {fileID: 285159903}
+  - {fileID: 662901144}
+  - {fileID: 1689210594}
+  - {fileID: 213732166}
+  - {fileID: 1926497961}
+  - {fileID: 498425798}
+  - {fileID: 160199751}
+  - {fileID: 637829698}
+  - {fileID: 1036450727}
+  - {fileID: 1684913615}
+  regenerateKey: 114
 --- !u!1 &467592205
 GameObject:
   m_ObjectHideFlags: 0
@@ -3394,7 +3425,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 817665269b1c0014a8c147dfd6d3634a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  lanes: []
 --- !u!4 &1684565643
 Transform:
   m_ObjectHideFlags: 0
