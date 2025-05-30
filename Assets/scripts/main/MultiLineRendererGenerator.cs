@@ -11,6 +11,12 @@ public class MultiLineRendererGenerator : MonoBehaviour
     public float startOffset = 0.3f;
     public float heightFactor = 0.3f;
 
+    [Header("Height Factor by Direction")]
+    public float topHeight = 0.2f;
+    public float bottomHeight = 0.4f;
+    public float leftHeight = 0.5f;
+    public float rightHeight = 0.3f;
+
     private enum CtrlSide { Left, Top, Right, Bottom }
 
     private class LaneData
@@ -65,10 +71,22 @@ public class MultiLineRendererGenerator : MonoBehaviour
         {
             lane.start = GetStartPoint(ctrl, lane.side);
             lane.end = lane.target.position;
-            lane.control = CalculateControlPoint(lane.start, lane.end, lane.isUpward, heightFactor);
+            lane.control = CalculateControlPoint(lane.start, lane.end, lane.isUpward, AdjustedHeightFactor(lane.side));
 
             DrawQuadraticBezier(lane.index, lane.start, lane.control, lane.end, lane.target.name);
         }
+    }
+
+    float AdjustedHeightFactor(CtrlSide side)
+    {
+        return side switch
+        {
+            CtrlSide.Top => topHeight,
+            CtrlSide.Bottom => bottomHeight,
+            CtrlSide.Left => leftHeight,
+            CtrlSide.Right => rightHeight,
+            _ => 0.3f
+        };
     }
 
     Vector2 GetStartPoint(Vector2 center, CtrlSide side)

@@ -1,4 +1,4 @@
-﻿// LaneMatcher.cs
+﻿// LaneMatcher.cs (exp 기반 정규화 적용 최종 버전)
 
 using System.Collections.Generic;
 using UnityEngine;
@@ -9,6 +9,8 @@ public class LaneMatcher : MonoBehaviour
 
     [SerializeField] private GazeLineDrawer gazeLineDrawer;
     [SerializeField] private SquareMoverManager squareMoverManager;
+
+    [Range(0f, 1f)] public float alpha = 0.7f; // Frechet 비중
 
     private void Awake()
     {
@@ -52,9 +54,8 @@ public class LaneMatcher : MonoBehaviour
 
         float gazeSpeed = CalculatePathSpeed(gazePath, timestamps);
 
-        float minAdjustedDistance = float.MaxValue;
+        float minScore = float.MaxValue;
         ColorLaneInfo bestMatch = null;
-        float bestSpeedSim = 0f;
 
         for (int i = 0; i < colorLanes.Count; i++)
         {
@@ -63,24 +64,30 @@ public class LaneMatcher : MonoBehaviour
             if (lanePath == null || lanePath.Count < 2) continue;
 
             float laneSpeed = objectSpeeds[i];
+
+            // [1] 프레셰 거리 계산 및 지수 기반 정규화
             float frechet = FrechetDistanceCalculator.Calculate(gazePath, lanePath);
-            float speedSim = CalculateSpeedSimilarity(gazeSpeed, laneSpeed);
-            float adjusted = frechet / Mathf.Max(speedSim, 0.0001f);
+            float normFD = 1f - Mathf.Exp(-frechet);
 
-            Debug.Log($"🔍 {lane.name}: 프레셰={frechet:F3}, 속도 유사도={speedSim:F3}, 조정거리={adjusted:F3} [gazeSpeed={gazeSpeed:F2}, laneSpeed={laneSpeed:F2}]");
+            // [2] 속도 유사도 계산
+            float speedSim = Mathf.Exp(-Mathf.Abs(gazeSpeed - laneSpeed));
 
-            if (adjusted < minAdjustedDistance)
+            // [3] adjusted 점수 계산
+            float adjusted = alpha * normFD + (1f - alpha) * (1f - speedSim);
+
+            Debug.Log($"🔍 {lane.name}: adjusted={adjusted:F3}, normFD={normFD:F3}, speedSim={speedSim:F3}, [gazeSpeed={gazeSpeed:F2}, laneSpeed={laneSpeed:F2}, α={alpha:F1}]");
+
+            if (adjusted < minScore)
             {
-                minAdjustedDistance = adjusted;
+                minScore = adjusted;
                 bestMatch = lane;
-                bestSpeedSim = speedSim;
             }
         }
 
         if (bestMatch != null)
         {
             bestMatch.Highlight(true);
-            Debug.Log($"✅ 가장 유사한 Lane: {bestMatch.name}, 속도 유사도: {bestSpeedSim:F3}");
+            Debug.Log($"✅ 최종 선택된 레인: {bestMatch.name}");
         }
     }
 
@@ -91,14 +98,7 @@ public class LaneMatcher : MonoBehaviour
         {
             totalDist += Vector3.Distance(path[i - 1], path[i]);
         }
-        float totalTime = timestamps[^1] - timestamps[0]; // ^1은 마지막 시간, 0은 첫 시간
+        float totalTime = timestamps[^1] - timestamps[0];
         return totalTime > 0 ? totalDist / totalTime : 0f;
-    }
-
-    private float CalculateSpeedSimilarity(float gazeSpeed, float objectSpeed)
-    {
-        if (gazeSpeed <= 0f || objectSpeed <= 0f) return 0f;
-        float diffRatio = Mathf.Abs(gazeSpeed - objectSpeed) / Mathf.Max(gazeSpeed, objectSpeed);
-        return Mathf.Clamp01(Mathf.Exp(-diffRatio));
     }
 }

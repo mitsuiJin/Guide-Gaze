@@ -1108,14 +1108,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ctrlKeyCenter: {fileID: 467592207}
   targetKeys:
-  - {fileID: 160199751}
-  - {fileID: 637829698}
-  - {fileID: 1036450727}
-  - {fileID: 1684913615}
+  - {fileID: 1689210594}
+  - {fileID: 213732166}
+  - {fileID: 1926497961}
+  - {fileID: 498425798}
   lineMaterialTemplate: {fileID: 2100000, guid: cc57a41ef8250ed46b087565d2e92829, type: 2}
   curveResolution: 50
   startOffset: 0.5
   heightFactor: 0.3
+  topHeight: 0.2
+  bottomHeight: 0.4
+  leftHeight: 0.6
+  rightHeight: 0.3
 --- !u!1 &467592205
 GameObject:
   m_ObjectHideFlags: 0
@@ -3844,6 +3848,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gazeLineDrawer: {fileID: 1176831113}
   squareMoverManager: {fileID: 180940681}
+  alpha: 0.7
 --- !u!4 &1787578043
 Transform:
   m_ObjectHideFlags: 0

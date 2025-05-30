@@ -1,6 +1,4 @@
-﻿// SquareMoverManager.cs
-
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -43,32 +41,37 @@ public class SquareMoverManager : MonoBehaviour
         int count = lanes.Count;
         moveSpeeds = new float[count];
 
-        //const float MIN_SPEED = 2.7f;
-        //const float MAX_SPEED = 7.2f;
+        // 사전 정의된 속도 그룹 (길이에 따라 배정됨)
+        float[] assignedSpeeds = new float[] { 2.8f, 3.5f, 4.3f, 5.5f };
 
-        // N개 속도를 균등 분포로 생성
-        float[] assignedSpeeds = new float[4]
-         {
-            2.5f, // 느림 (예: Z)
-            3.0f, // 중간 (예: X)
-            3.5f, // 빠름 (예: C)
-            4.0f  // 가장 빠름 (예: V) → 이 이상은 피하는 게 좋음
-         };
+        // 레인과 길이를 묶어서 리스트로 저장
+        var laneLengthPairs = new List<(ColorLaneInfo lane, float length)>();
 
         for (int i = 0; i < count; i++)
         {
-            var lane = lanes[i];
-            float length = GetPathLength(lane.positions);
-            float speed = assignedSpeeds[i];
+            float len = GetPathLength(lanes[i].positions);
+            laneLengthPairs.Add((lanes[i], len));
+        }
+
+        // 길이 기준 오름차순 정렬
+        laneLengthPairs.Sort((a, b) => a.length.CompareTo(b.length));
+
+        for (int i = 0; i < laneLengthPairs.Count; i++)
+        {
+            var lane = laneLengthPairs[i].lane;
+            float length = laneLengthPairs[i].length;
+
+            // 정해진 속도 배열에서 인덱스에 따라 속도 선택
+            float speed = assignedSpeeds[Mathf.Min(i, assignedSpeeds.Length - 1)];
             float duration = length / speed;
 
-            moveSpeeds[i] = speed;
-            CreateAndMoveSquare(lane, duration);
+            int originalIndex = lanes.IndexOf(lane);
+            moveSpeeds[originalIndex] = speed;
 
-            Debug.Log($"[Lane {i}] 길이={length:F2}, 속도={speed:F2}, 도달시간={duration:F2}");
+            CreateAndMoveSquare(lane, duration);
+            Debug.Log($"[Lane {originalIndex}] 길이={length:F2}, 속도={speed:F2}, 도달시간={duration:F2}");
         }
     }
-
 
     private void CreateAndMoveSquare(ColorLaneInfo lane, float duration)
     {
@@ -97,25 +100,53 @@ public class SquareMoverManager : MonoBehaviour
         int count = path.Count;
         if (count < 2) yield break;
 
+        // [1] 구간별 거리와 누적 거리 계산
+        float[] segmentLengths = new float[count - 1];
+        float[] accumulatedLengths = new float[count];
+        float totalLength = 0f;
+
+        for (int i = 0; i < count - 1; i++)
+        {
+            float segLen = Vector3.Distance(path[i], path[i + 1]);
+            segmentLengths[i] = segLen;
+            totalLength += segLen;
+            accumulatedLengths[i + 1] = totalLength;
+        }
+
         while (true)
         {
-            float t = 0f;
-            while (t < 1f)
-            {
-                float total = (count - 1);
-                float ft = t * total;
-                int idx = Mathf.FloorToInt(ft);
-                int nextIdx = Mathf.Min(idx + 1, count - 1);
-                float lerpT = ft - idx;
+            float elapsed = 0f;
 
-                Vector3 pos = Vector3.Lerp(path[idx], path[nextIdx], lerpT);
+            while (elapsed < duration)
+            {
+                float targetDistance = (elapsed / duration) * totalLength;
+
+                // [2] targetDistance가 포함된 구간 찾기
+                int segIndex = 0;
+                for (int i = 0; i < accumulatedLengths.Length - 1; i++)
+                {
+                    if (targetDistance >= accumulatedLengths[i] && targetDistance <= accumulatedLengths[i + 1])
+                    {
+                        segIndex = i;
+                        break;
+                    }
+                }
+
+                // [3] 해당 구간 내에서의 보간 비율
+                float segStart = accumulatedLengths[segIndex];
+                float segEnd = accumulatedLengths[segIndex + 1];
+                float segmentT = (targetDistance - segStart) / (segEnd - segStart);
+
+                // [4] 위치 계산
+                Vector3 pos = Vector3.Lerp(path[segIndex], path[segIndex + 1], segmentT);
                 square.position = pos;
 
-                t += Time.deltaTime / duration;
+                elapsed += Time.deltaTime;
                 yield return null;
             }
         }
     }
+
 
     private float GetPathLength(List<Vector3> path)
     {
