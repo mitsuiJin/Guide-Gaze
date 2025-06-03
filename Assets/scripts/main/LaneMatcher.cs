@@ -7,11 +7,6 @@ public class LaneMatcher : MonoBehaviour
 
     [SerializeField] private GazeLineDrawer gazeLineDrawer;
     [SerializeField] private SquareMoverManager squareMoverManager;
-    [SerializeField] private GameObject targetKeyObject; // Inspector에서 타겟 오브젝트 지정
-
-    [Range(0f, 1f)] public float alpha = 0.7f; // Frechet 비중
-
-    private int currentTrialId = 1; // 1부터 시작하여 자동 증가
 
     private void Awake()
     {
@@ -58,11 +53,6 @@ public class LaneMatcher : MonoBehaviour
         float minScore = float.MaxValue;
         ColorLaneInfo bestMatch = null;
 
-        // 로깅용 리스트
-        List<string> laneNames = new List<string>();
-        List<float> frechets = new List<float>();
-        List<float> speedDiffs = new List<float>();
-
         for (int i = 0; i < colorLanes.Count; i++)
         {
             var lane = colorLanes[i];
@@ -71,26 +61,24 @@ public class LaneMatcher : MonoBehaviour
 
             float laneSpeed = objectSpeeds[i];
 
-            // [1] 프레셰 거리 계산 및 지수 기반 정규화
+            // [1] Frechet 거리 계산
             float frechet = FrechetDistanceCalculator.Calculate(gazePath, lanePath);
-            float normFD = 1f - Mathf.Exp(-frechet);
 
-            // [2] 속도 유사도 계산
-            float speedSim = Mathf.Exp(-Mathf.Abs(gazeSpeed - laneSpeed));
+            // [2] 방향 포함 속도 차이 계산 (절댓값 X)
+            float speedDiff = gazeSpeed - laneSpeed;
 
-            // [3] adjusted 점수 계산
-            float adjusted = alpha * normFD + (1f - alpha) * (1f - speedSim);
+            // [3] Z-score 정규화 (평균과 표준편차는 고정값 사용)
+            float zFrechet = (frechet - 0.5492f) / 0.1752f;
+            float zSpeedDiff = (speedDiff - (-0.0439f)) / 0.3927f;
 
-            Debug.Log($"🔍 {lane.name}: adjusted={adjusted:F3}, normFD={normFD:F3}, speedSim={speedSim:F3}, [gazeSpeed={gazeSpeed:F2}, laneSpeed={laneSpeed:F2}, α={alpha:F1}]");
+            // [4] 신뢰도 기반 가중 평균 (α = 0.834)
+            float matchError = 0.834f * zFrechet + 0.166f * zSpeedDiff;
 
-            // 로깅 리스트에 추가
-            laneNames.Add(lane.name);
-            frechets.Add(frechet);
-            speedDiffs.Add((gazeSpeed - laneSpeed)); // 절댓값으로 계산하면 분산 계산 시 왜곡이 생김.
+            Debug.Log($"🔍 {lane.name}: matchError={matchError:F3}, zFrechet={zFrechet:F3}, zSpeedDiff={zSpeedDiff:F3}, frechet={frechet:F3}, speedDiff={speedDiff:F3}, gazeSpeed={gazeSpeed:F2}, laneSpeed={laneSpeed:F2}");
 
-            if (adjusted < minScore)
+            if (matchError < minScore)
             {
-                minScore = adjusted;
+                minScore = matchError;
                 bestMatch = lane;
             }
         }
@@ -99,17 +87,6 @@ public class LaneMatcher : MonoBehaviour
         {
             bestMatch.Highlight(true);
             Debug.Log($"✅ 최종 선택된 레인: {bestMatch.name}");
-
-            // 로깅
-            CueLogger logger = FindFirstObjectByType<CueLogger>();
-            if (logger != null)
-            {
-                string targetLaneName = targetKeyObject != null ? targetKeyObject.name : "Unknown";
-                logger.LogTrial(currentTrialId, targetLaneName, bestMatch.name, laneNames, frechets, speedDiffs);
-            }
-
-            // trial ID 증가
-            currentTrialId++;
         }
     }
 

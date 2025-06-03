@@ -1108,7 +1108,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ctrlKeyCenter: {fileID: 467592207}
   targetKeys:
-  - {fileID: 160199751}
+  - {fileID: 1036450727}
   - {fileID: 637829698}
   - {fileID: 1036450727}
   - {fileID: 1684913615}
@@ -1118,7 +1118,7 @@ MonoBehaviour:
   heightFactor: 0.3
   topHeight: 0.2
   bottomHeight: 0.4
-  leftHeight: 0.6
+  leftHeight: 0
   rightHeight: 0.3
 --- !u!1 &467592205
 GameObject:
@@ -2058,7 +2058,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 76930ce9a288e7943a0644704f8d7389, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  targetKeyObject: {fileID: 160199749}
+  targetKeyObject: {fileID: 1684913613}
 --- !u!4 &838186935
 Transform:
   m_ObjectHideFlags: 0

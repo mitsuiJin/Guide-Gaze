@@ -96,7 +96,7 @@ public class GazeLineDrawer : MonoBehaviour
             if (gazeTimestamps.Count >= 2)
             {
                 float interval = gazeTimestamps[^1] - gazeTimestamps[^2];
-                Debug.Log($"⏱ 시선 포인트 간격: {interval:F4}초");
+                //Debug.Log($"⏱ 시선 포인트 간격: {interval:F4}초");
             }
         }
     }
