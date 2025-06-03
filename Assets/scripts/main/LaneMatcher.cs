@@ -1,6 +1,4 @@
-﻿// LaneMatcher.cs (exp 기반 정규화 적용 최종 버전)
-
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class LaneMatcher : MonoBehaviour
@@ -9,8 +7,11 @@ public class LaneMatcher : MonoBehaviour
 
     [SerializeField] private GazeLineDrawer gazeLineDrawer;
     [SerializeField] private SquareMoverManager squareMoverManager;
+    [SerializeField] private GameObject targetKeyObject; // Inspector에서 타겟 오브젝트 지정
 
     [Range(0f, 1f)] public float alpha = 0.7f; // Frechet 비중
+
+    private int currentTrialId = 1; // 1부터 시작하여 자동 증가
 
     private void Awake()
     {
@@ -57,6 +58,11 @@ public class LaneMatcher : MonoBehaviour
         float minScore = float.MaxValue;
         ColorLaneInfo bestMatch = null;
 
+        // 로깅용 리스트
+        List<string> laneNames = new List<string>();
+        List<float> frechets = new List<float>();
+        List<float> speedDiffs = new List<float>();
+
         for (int i = 0; i < colorLanes.Count; i++)
         {
             var lane = colorLanes[i];
@@ -77,6 +83,11 @@ public class LaneMatcher : MonoBehaviour
 
             Debug.Log($"🔍 {lane.name}: adjusted={adjusted:F3}, normFD={normFD:F3}, speedSim={speedSim:F3}, [gazeSpeed={gazeSpeed:F2}, laneSpeed={laneSpeed:F2}, α={alpha:F1}]");
 
+            // 로깅 리스트에 추가
+            laneNames.Add(lane.name);
+            frechets.Add(frechet);
+            speedDiffs.Add(Mathf.Abs(gazeSpeed - laneSpeed));
+
             if (adjusted < minScore)
             {
                 minScore = adjusted;
@@ -88,6 +99,17 @@ public class LaneMatcher : MonoBehaviour
         {
             bestMatch.Highlight(true);
             Debug.Log($"✅ 최종 선택된 레인: {bestMatch.name}");
+
+            // 로깅
+            CueLogger logger = FindFirstObjectByType<CueLogger>();
+            if (logger != null)
+            {
+                string targetLaneName = targetKeyObject != null ? targetKeyObject.name : "Unknown";
+                logger.LogTrial(currentTrialId, targetLaneName, bestMatch.name, laneNames, frechets, speedDiffs);
+            }
+
+            // trial ID 증가
+            currentTrialId++;
         }
     }
 
