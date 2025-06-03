@@ -86,7 +86,7 @@ public class LaneMatcher : MonoBehaviour
             // 로깅 리스트에 추가
             laneNames.Add(lane.name);
             frechets.Add(frechet);
-            speedDiffs.Add(Mathf.Abs(gazeSpeed - laneSpeed));
+            speedDiffs.Add((gazeSpeed - laneSpeed)); // 절댓값으로 계산하면 분산 계산 시 왜곡이 생김.
 
             if (adjusted < minScore)
             {
