@@ -37,8 +37,12 @@ public class MultiLineRendererGenerator : MonoBehaviour
     [Header("Curve Style (P0 Side Based)")]
     [Tooltip("P0가 Top 또는 Right일 때 (안쪽 선) 적용될 높이 계수")]
     public float innerCurveHeightFactor = 0.25f;
-    [Tooltip("P0가 Left 또는 Bottom일 때 (바깥쪽 선) 적용될 높이 계수. 3차 베지어 시 핸들 강도에 영향.")]
-    public float outerCurveHeightFactor = 1.0f; // 기본값을 높여서 곡률을 더 크게 시작하도록 유도
+    // outerCurveHeightFactor 분리
+    [Tooltip("P0가 Left일 때 (바깥쪽 선) 적용될 높이 계수. 3차 베지어 시 핸들 강도에 영향.")]
+    public float leftOuterCurveHeightFactor = 1.0f;
+    [Tooltip("P0가 Bottom일 때 (바깥쪽 선) 적용될 높이 계수. 3차 베지어 시 핸들 강도에 영향.")]
+    public float bottomOuterCurveHeightFactor = 1.0f;
+
 
     [Header("P1 Squeeze Heuristic")]
     [Tooltip("인접 키와 각도 차이가 이 값 미만이면 heightFactor 감소 시작")]
@@ -50,14 +54,28 @@ public class MultiLineRendererGenerator : MonoBehaviour
     [Range(0.1f, 1.0f)]
     public float outerToInnerSqueezeMultiplier = 0.4f;
     [Tooltip("모든 heightFactor가 Clamp될 최소/최대값. 이 최소값은 곡선의 최소 곡률에 영향.")]
-    public Vector2 minMaxHeightFactorClamp = new Vector2(0.25f, 1.2f); // 최소/최대값 범위 확장
+    public Vector2 minMaxHeightFactorClamp = new Vector2(0.25f, 1.2f);
 
-    [Header("Cubic Bezier Settings (For Left/Bottom Lanes)")]
-    [Tooltip("좌/하단 3차 곡선: P0에서 CP1까지의 기본 이격 거리. 이 값에 OuterCurveHeightFactor와 압착 변조가 곱해짐.")]
-    public float cubicP0ToCp1Offset = 1.0f; // 사용자가 직접 제어할 CP1 이격 거리
-    [Tooltip("좌/하단 3차 곡선: P3에서 CP2까지의 기본 이격 거리. 이 값에 OuterCurveHeightFactor와 압착 변조가 곱해짐.")]
-    public float cubicP3ToCp2Offset = 1.0f; // 사용자가 직접 제어할 CP2 이격 거리
-    // public float cubicHandleLengthFactor = 0.4f; // 이 변수는 위의 Offset 값들로 대체됨
+    [Header("Cubic Bezier Settings - Left Lanes")]
+    [Tooltip("좌측 3차 곡선: P0에서 CP1까지의 기본 이격 거리. LeftOuterCurveHeightFactor와 압착 변조가 곱해짐.")]
+    public float leftCubicP0ToCp1Offset = 1.0f;
+    [Tooltip("좌측 3차 곡선: P3에서 CP2까지의 기본 이격 거리. LeftOuterCurveHeightFactor와 압착 변조가 곱해짐.")]
+    public float leftCubicP3ToCp2Offset = 1.0f;
+    [Tooltip("좌측 3차 곡선: CP1의 기본 방향(P0에서 slot 방향)에서 추가적인 각도 오프셋 (도).")]
+    public float leftCubicCp1AngleOffset = 0f;
+    [Tooltip("좌측 3차 곡선: CP2의 기본 방향(P3에서 CP1 방향)에서 추가적인 각도 오프셋 (도).")]
+    public float leftCubicCp2AngleOffset = 0f;
+
+    [Header("Cubic Bezier Settings - Bottom Lanes")]
+    [Tooltip("하단 3차 곡선: P0에서 CP1까지의 기본 이격 거리. BottomOuterCurveHeightFactor와 압착 변조가 곱해짐.")]
+    public float bottomCubicP0ToCp1Offset = 1.0f;
+    [Tooltip("하단 3차 곡선: P3에서 CP2까지의 기본 이격 거리. BottomOuterCurveHeightFactor와 압착 변조가 곱해짐.")]
+    public float bottomCubicP3ToCp2Offset = 1.0f;
+    [Tooltip("하단 3차 곡선: CP1의 기본 방향(P0에서 slot 방향)에서 추가적인 각도 오프셋 (도).")]
+    public float bottomCubicCp1AngleOffset = 0f;
+    [Tooltip("하단 3차 곡선: CP2의 기본 방향(P3에서 CP1 방향)에서 추가적인 각도 오프셋 (도).")]
+    public float bottomCubicCp2AngleOffset = 0f;
+
 
     [Header("Target Keys (Optional - for initial non-pattern state)")]
     public List<Transform> targetKeys;
@@ -73,14 +91,14 @@ public class MultiLineRendererGenerator : MonoBehaviour
     private static readonly List<CtrlSide> P0_SLOT_PROCESSING_ORDER = new List<CtrlSide> { CtrlSide.Right, CtrlSide.Top, CtrlSide.Left, CtrlSide.Bottom };
 
     private class LaneGenerationData
-    { /* 이전과 동일 */
+    {
         public int initialSortIndex; public Transform targetKey; public Vector2 P0_startPoint;
         public Vector2 P3_endPoint; public float actualAngleRad; public CtrlSide assignedP0Side;
         public bool isCubic; public Vector2 CP1_cubic; public Vector2 CP2_cubic;
         public Vector2 P1_quadratic; public float finalHeightFactor;
     }
     private struct ProcessedKeyInfo
-    { /* 이전과 동일 */
+    {
         public Transform transform; public Vector2 worldPos; public float angleRad;
     }
 
@@ -91,8 +109,16 @@ public class MultiLineRendererGenerator : MonoBehaviour
     private bool isInPatternMode = false;
     private Dictionary<string, Transform> availableKeyTransformsMap = new Dictionary<string, Transform>();
 
+    private Vector2 RotateVector(Vector2 v, float degrees)
+    { /* 이전과 동일 */
+        if (degrees == 0) return v; float radians = degrees * Mathf.Deg2Rad;
+        float sin = Mathf.Sin(radians); float cos = Mathf.Cos(radians);
+        float tx = v.x; float ty = v.y;
+        return new Vector2(cos * tx - sin * ty, sin * tx + cos * ty);
+    }
+
     void Awake()
-    { /* 이전과 거의 동일, PopulateDefinedPatterns 호출 */
+    { /* 이전과 동일 */
         if (allAvailableKeys != null) { foreach (Transform keyTransform in allAvailableKeys) { if (keyTransform != null) { if (!availableKeyTransformsMap.ContainsKey(keyTransform.name)) { availableKeyTransformsMap.Add(keyTransform.name, keyTransform); } else { Debug.LogWarning($"[MLRG] Duplicate key name '{keyTransform.name}' in allAvailableKeys. Using the first one encountered.", this); } } } }
         else { Debug.LogError("[MLRG] allAvailableKeys list is not assigned!", this); }
         PopulateDefinedPatterns();
@@ -103,7 +129,7 @@ public class MultiLineRendererGenerator : MonoBehaviour
         if (Input.GetKeyDown(regenerateKey)) { isInPatternMode = true; if (definedPatterns.Count > 0) { currentPatternIndex++; if (currentPatternIndex >= definedPatterns.Count) { currentPatternIndex = 0; } Debug.Log($"[MLRG] Applying pattern: {definedPatterns[currentPatternIndex].name} (Index: {currentPatternIndex})", this); } else { currentPatternIndex = -1; Debug.LogWarning("[MLRG] Regenerate key pressed, but no patterns are defined.", this); } ProcessLaneGeneration(); }
     }
     void PopulateDefinedPatterns()
-    { /* 이전과 동일 */
+    { /* 이전과 동일 (사용자 제공 패턴 목록 사용) */
         definedPatterns.Clear();
         definedPatterns.Add(new KeyPattern("I 유형 1", "D", "S", "A", "F"));
         definedPatterns.Add(new KeyPattern("I 유형 2 - 첫번째 라인일 경우.", "C", "Z", "X", "V"));
@@ -142,14 +168,13 @@ public class MultiLineRendererGenerator : MonoBehaviour
     }
 
     void ProcessLaneGeneration()
-    { /* isCubic 및 제어점 계산 전까지는 이전과 거의 동일 */
+    {
         foreach (Transform child in transform) { if (child.gameObject.name.StartsWith("Curve_")) Destroy(child.gameObject); }
         laneGenDataList.Clear();
         if (ctrlKeyCenter == null) { Debug.LogError("[MLRG] ctrlKeyCenter not assigned.", this); OnLanesRegenerated?.Invoke(); return; }
         Vector2 ctrlPos = ctrlKeyCenter.position;
         List<ProcessedKeyInfo> actualTargetKeysSortedForSqueeze = new List<ProcessedKeyInfo>();
 
-        // 패턴 모드 또는 기존 모드에 따른 키 선택 및 기본 정보 설정 (이전과 동일)
         if (isInPatternMode && currentPatternIndex >= 0 && currentPatternIndex < definedPatterns.Count)
         {
             KeyPattern currentActualPattern = definedPatterns[currentPatternIndex];
@@ -188,11 +213,25 @@ public class MultiLineRendererGenerator : MonoBehaviour
 
         if (laneGenDataList.Count == 0) { OnLanesRegenerated?.Invoke(); return; }
 
-        // finalHeightFactor 계산 (압착 휴리스틱 적용) - 이전과 동일
         for (int i = 0; i < laneGenDataList.Count; i++)
         {
             LaneGenerationData currentLane = laneGenDataList[i]; if (currentLane.targetKey == null) continue;
-            float baseHeightFactor = (currentLane.assignedP0Side == CtrlSide.Top || currentLane.assignedP0Side == CtrlSide.Right) ? this.innerCurveHeightFactor : this.outerCurveHeightFactor;
+
+            // baseHeightFactor 결정 시 분리된 OuterCurveHeightFactor 사용
+            float baseHeightFactor;
+            if (currentLane.assignedP0Side == CtrlSide.Top || currentLane.assignedP0Side == CtrlSide.Right)
+            {
+                baseHeightFactor = this.innerCurveHeightFactor;
+            }
+            else if (currentLane.assignedP0Side == CtrlSide.Left)
+            {
+                baseHeightFactor = this.leftOuterCurveHeightFactor;
+            }
+            else
+            { // Bottom
+                baseHeightFactor = this.bottomOuterCurveHeightFactor;
+            }
+
             float squeezeMultiplier = 1.0f;
             if (actualTargetKeysSortedForSqueeze.Count == REQUIRED_TARGET_KEYS)
             {
@@ -211,13 +250,12 @@ public class MultiLineRendererGenerator : MonoBehaviour
             currentLane.finalHeightFactor = Mathf.Clamp(currentLane.finalHeightFactor, minMaxHeightFactorClamp.x, minMaxHeightFactorClamp.y);
         }
 
-        // 제어점 계산 (P1 또는 CP1, CP2)
         for (int i = 0; i < laneGenDataList.Count; i++)
         {
             LaneGenerationData currentLane = laneGenDataList[i];
             if (currentLane.targetKey == null) continue;
 
-            if (currentLane.isCubic) // Left 또는 Bottom 레인 (3차 베지어)
+            if (currentLane.isCubic)
             {
                 Vector2 p0 = currentLane.P0_startPoint;
                 Vector2 p3 = currentLane.P3_endPoint;
@@ -231,69 +269,70 @@ public class MultiLineRendererGenerator : MonoBehaviour
                 else
                 {
                     Vector2 slotOutwardDir = Vector2.zero;
-                    if (currentLane.assignedP0Side == CtrlSide.Left) slotOutwardDir = Vector2.left;
-                    else if (currentLane.assignedP0Side == CtrlSide.Bottom) slotOutwardDir = Vector2.down;
+                    float currentOuterCurveHeightFactor = 1.0f;
+                    float currentCubicP0ToCp1Offset = 1.0f;
+                    float currentCubicP3ToCp2Offset = 1.0f;
+                    float currentCubicCp1AngleOffset = 0f;
+                    float currentCubicCp2AngleOffset = 0f;
 
-                    // --- CP1, CP2 핸들 길이 계산 방식 수정 ---
-                    // finalHeightFactor (압착 및 클램핑 후, minMaxHeightFactorClamp 범위 내)를 사용한 변조
-                    // finalHeightFactor가 최소일 때 핸들 길이를 기본 이격 거리의 30%로,
-                    // 최대일 때 기본 이격 거리의 100%로 만드는 예시
+                    if (currentLane.assignedP0Side == CtrlSide.Left)
+                    {
+                        slotOutwardDir = Vector2.left;
+                        currentOuterCurveHeightFactor = this.leftOuterCurveHeightFactor;
+                        currentCubicP0ToCp1Offset = this.leftCubicP0ToCp1Offset;
+                        currentCubicP3ToCp2Offset = this.leftCubicP3ToCp2Offset;
+                        currentCubicCp1AngleOffset = this.leftCubicCp1AngleOffset;
+                        currentCubicCp2AngleOffset = this.leftCubicCp2AngleOffset;
+                    }
+                    else if (currentLane.assignedP0Side == CtrlSide.Bottom)
+                    {
+                        slotOutwardDir = Vector2.down;
+                        currentOuterCurveHeightFactor = this.bottomOuterCurveHeightFactor;
+                        currentCubicP0ToCp1Offset = this.bottomCubicP0ToCp1Offset;
+                        currentCubicP3ToCp2Offset = this.bottomCubicP3ToCp2Offset;
+                        currentCubicCp1AngleOffset = this.bottomCubicCp1AngleOffset;
+                        currentCubicCp2AngleOffset = this.bottomCubicCp2AngleOffset;
+                    }
+
                     float squeezeModulation = Mathf.InverseLerp(minMaxHeightFactorClamp.x, minMaxHeightFactorClamp.y, currentLane.finalHeightFactor);
-                    squeezeModulation = Mathf.Lerp(0.3f, 1.0f, squeezeModulation); // 최소 30% ~ 최대 100%로 변조
+                    squeezeModulation = Mathf.Lerp(0.3f, 1.0f, squeezeModulation);
 
                     // CP1 계산
-                    float cp1_actual_offset = cubicP0ToCp1Offset * outerCurveHeightFactor * squeezeModulation;
-                    currentLane.CP1_cubic = p0 + slotOutwardDir * cp1_actual_offset;
+                    float cp1_actual_offset = currentCubicP0ToCp1Offset * currentOuterCurveHeightFactor * squeezeModulation;
+                    Vector2 cp1BaseDirection = RotateVector(slotOutwardDir, currentCubicCp1AngleOffset);
+                    currentLane.CP1_cubic = p0 + cp1BaseDirection * cp1_actual_offset;
 
                     // CP2 계산
-                    Vector2 incomingTangentP3;
-                    // CP1이 P3와 매우 가까운 극단적인 경우, P0에서 오는 방향을 사용
-                    if (Vector2.Distance(p3, currentLane.CP1_cubic) < 0.01f) // 매우 작은 값으로 비교
+                    Vector2 incomingTangentP3_baseDirection;
+                    if (Vector2.Distance(p3, currentLane.CP1_cubic) < 0.01f)
                     {
-                        if (distP0P3 < 0.01f) // P0와 P3도 매우 가까우면 (사실상 한 점)
-                        {
-                            incomingTangentP3 = -slotOutwardDir; // 임의의 후퇴 방향
-                        }
-                        else
-                        {
-                            incomingTangentP3 = (p3 - p0).normalized; // P0에서 오는 방향
-                        }
+                        if (distP0P3 < 0.01f) { incomingTangentP3_baseDirection = -slotOutwardDir; }
+                        else { incomingTangentP3_baseDirection = (p3 - p0).normalized; }
                     }
                     else
                     {
-                        incomingTangentP3 = (p3 - currentLane.CP1_cubic).normalized; // CP1에서 오는 방향
+                        incomingTangentP3_baseDirection = (p3 - currentLane.CP1_cubic).normalized;
                     }
-
-                    float cp2_actual_offset = cubicP3ToCp2Offset * outerCurveHeightFactor * squeezeModulation;
-                    currentLane.CP2_cubic = p3 - incomingTangentP3 * cp2_actual_offset;
+                    Vector2 cp2FinalIncomingTangent = RotateVector(incomingTangentP3_baseDirection, currentCubicCp2AngleOffset);
+                    float cp2_actual_offset = currentCubicP3ToCp2Offset * currentOuterCurveHeightFactor * squeezeModulation;
+                    currentLane.CP2_cubic = p3 - cp2FinalIncomingTangent * cp2_actual_offset;
                 }
             }
-            else // Quadratic (Right/Top 레인, 또는 Original Mode의 L/B 레인)
-            {
+            else
+            { // Quadratic
                 bool p1BaseAtP0ForThisQuadratic = false;
                 bool forceSlotOutwardForThisQuad = false;
                 if (!isInPatternMode && (currentLane.assignedP0Side == CtrlSide.Left || currentLane.assignedP0Side == CtrlSide.Bottom))
                 {
-                    p1BaseAtP0ForThisQuadratic = true; // Original mode L/B Quad는 P0에서 시작
-                    forceSlotOutwardForThisQuad = true; // Original mode L/B Quad는 슬롯 방향으로 팽창
+                    p1BaseAtP0ForThisQuadratic = true;
+                    forceSlotOutwardForThisQuad = true;
                 }
-
-                currentLane.P1_quadratic = CalculateQuadraticP1Internal(
-                    currentLane.P0_startPoint,
-                    currentLane.P3_endPoint,
-                    ctrlPos,
-                    currentLane.assignedP0Side,
-                    currentLane.finalHeightFactor,
-                    startOffset,
-                    forceSlotOutwardForThisQuad,
-                    p1BaseAtP0ForThisQuadratic
-                );
+                currentLane.P1_quadratic = CalculateQuadraticP1Internal(currentLane.P0_startPoint, currentLane.P3_endPoint, ctrlPos, currentLane.assignedP0Side, currentLane.finalHeightFactor, startOffset, forceSlotOutwardForThisQuad, p1BaseAtP0ForThisQuadratic);
             }
         }
 
-        // 그리기
         foreach (var laneData in laneGenDataList)
-        { /* 이전과 동일 */
+        {
             if (laneData.targetKey != null)
             {
                 if (laneData.isCubic) { DrawCubicBezier(laneData.initialSortIndex, laneData.P0_startPoint, laneData.CP1_cubic, laneData.CP2_cubic, laneData.P3_endPoint, laneData.targetKey.name); }
@@ -320,17 +359,13 @@ public class MultiLineRendererGenerator : MonoBehaviour
         bool useEffectiveSlotOutwardNormal = false;
         if (forceSlotOutwardNormalForAssignedSide && (assignedSideForP0 == CtrlSide.Left || assignedSideForP0 == CtrlSide.Bottom))
         { useEffectiveSlotOutwardNormal = true; }
-        // Right/Top인 경우, 또는 L/B이지만 forceSlotOutwardNormalForAssignedSide가 false인 경우 (호출부에서 결정)
-        // L/B에 대해 forceSlotOutwardNormalForAssignedSide가 false로 넘어오는 경우는 p1QuadGhost 계산 시에는 없음 (항상 true).
-        // 실제 L/B Quadratic을 그릴 때(original mode)는 true로 넘어옴.
-        // 따라서 이 변수는 사실상 "assignedSideForP0가 L/B인가 그리고 force가 켜졌는가?"를 나타냄.
 
-        if (useEffectiveSlotOutwardNormal) // L/B이고 force 파라미터가 true일 때 (또는 L/B이기만 하면 항상 슬롯방향 원할 시 수정)
+        if (useEffectiveSlotOutwardNormal)
         {
             float slotAngleRad = P0_SLOT_ANGLES_DEG[assignedSideForP0] * Mathf.Deg2Rad;
             referenceDirectionForNormal = new Vector2(Mathf.Cos(slotAngleRad), Mathf.Sin(slotAngleRad)).normalized;
         }
-        else // Right/Top (또는 L/B인데 useEffectiveSlotOutwardNormal이 false로 결정된 경우 - 현재 로직상 R/T만 해당)
+        else
         {
             Vector2 vecCtrlToP0P2Midpoint = p0p2Midpoint - ctrlPos;
             if (vecCtrlToP0P2Midpoint.sqrMagnitude < (currentStartOffset * 0.01f) * (currentStartOffset * 0.01f))
@@ -350,7 +385,6 @@ public class MultiLineRendererGenerator : MonoBehaviour
         float controlPointOffsetDistance = actualHeightFactor * distP0P2;
         return p1BasePoint + perpendicularNormal * controlPointOffsetDistance;
     }
-
     void SelectRandomTargetKeys()
     { /* 이전과 동일 */
         selectedTargetKeysForDrawing.Clear(); if (allAvailableKeys == null || allAvailableKeys.Count < REQUIRED_TARGET_KEYS) { Debug.LogError($"[SelectRandomTargetKeys] Random selection not possible: allAvailableKeys is null or has fewer than {REQUIRED_TARGET_KEYS} elements.", this); return; }
@@ -371,6 +405,7 @@ public class MultiLineRendererGenerator : MonoBehaviour
         GameObject lineObj = new GameObject("Curve_Cubic_" + targetKeyName + "_" + colorIndex); lineObj.transform.parent = this.transform; LineRenderer lr = lineObj.AddComponent<LineRenderer>(); lr.useWorldSpace = true; lr.positionCount = curveResolution; lr.widthMultiplier = 0.05f; lr.sortingOrder = 1; float hue = colorIndex / (float)REQUIRED_TARGET_KEYS; Color colorVal = Color.HSVToRGB(hue, 1f, 1f); if (lineMaterialTemplate != null) { Material matInstance = new Material(lineMaterialTemplate); matInstance.color = colorVal; lr.material = matInstance; }
         lr.startColor = colorVal; lr.endColor = colorVal; ColorLaneInfo cli = lineObj.GetComponent<ColorLaneInfo>(); if (cli == null) cli = lineObj.AddComponent<ColorLaneInfo>(); if (cli.positions == null) cli.positions = new List<Vector3>(); else cli.positions.Clear(); for (int k = 0; k < curveResolution; k++) { float t = k / (float)(curveResolution - 1); float omt = 1f - t; float omt2 = omt * omt; float t2 = t * t; Vector2 pointOnCurve = omt * omt2 * p0 + 3f * omt2 * t * cp1 + 3f * omt * t2 * cp2 + t * t2 * p3; Vector3 point3D = new Vector3(pointOnCurve.x, pointOnCurve.y, 0f); lr.SetPosition(k, point3D); if (cli.positions != null) cli.positions.Add(point3D); }
     }
+
 }
 
 /*
@@ -378,38 +413,41 @@ public class MultiLineRendererGenerator : MonoBehaviour
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
-public class ColorLaneInfo : MonoBehaviour
-{
+public class ColorLaneInfo : MonoBehaviour {
     public List<Vector3> positions = new List<Vector3>();
     [HideInInspector] public LineRenderer lineRenderer;
-
     private Coroutine blinkCoroutine;
     private float initialWidthMultiplier = -1f; 
-
-    void Awake()
-    {
+    void Awake() {
         lineRenderer = GetComponent<LineRenderer>();
-        if (lineRenderer == null)
-        {
-            Debug.LogError($"[ColorLaneInfo] LineRenderer component not found on {gameObject.name}.");
-        }
-        else
-        {
-            initialWidthMultiplier = lineRenderer.widthMultiplier;
-        }
-        // (ColorLaneManager 등록 로직 등은 사용자의 ColorLaneInfo.cs 버전에 따라 추가)
+        if (lineRenderer == null) { Debug.LogError($"[ColorLaneInfo] LineRenderer component not found on {gameObject.name}."); }
+        else { initialWidthMultiplier = lineRenderer.widthMultiplier; }
+        if (ColorLaneManager.Instance != null) { ColorLaneManager.Instance.RegisterLane(this); }
+        else { Debug.LogWarning($"[ColorLaneInfo] ColorLaneManager.Instance not found during Awake for {gameObject.name}. Lane will not be registered.");}
     }
-
-    void OnDestroy()
-    {
-        // (ColorLaneManager 해제 로직 등)
-        if (blinkCoroutine != null)
-        {
-            StopCoroutine(blinkCoroutine);
-            blinkCoroutine = null;
+    void OnDestroy() {
+        if (ColorLaneManager.Instance != null) { ColorLaneManager.Instance.UnregisterLane(this); }
+        if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; }
+    }
+    public void Highlight(bool isOn) {
+        if (lineRenderer == null) return;
+        if (initialWidthMultiplier < 0 && lineRenderer != null) { initialWidthMultiplier = lineRenderer.widthMultiplier; }
+        if (isOn) {
+            if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); if (initialWidthMultiplier >= 0) lineRenderer.widthMultiplier = initialWidthMultiplier; }
+            if (initialWidthMultiplier >= 0) { blinkCoroutine = StartCoroutine(BlinkLine()); }
+        } else {
+            if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; }
+            if (initialWidthMultiplier >= 0) lineRenderer.widthMultiplier = initialWidthMultiplier;
         }
     }
-    // (Highlight, BlinkLine, GetWorldPoints 등 메서드들은 사용자의 ColorLaneInfo.cs 버전에 따라 추가)
+    private IEnumerator BlinkLine() {
+        if (initialWidthMultiplier < 0) yield break;
+        for (int i = 0; i < 3; i++) {
+            lineRenderer.widthMultiplier = initialWidthMultiplier * 2f; yield return new WaitForSeconds(0.2f);
+            lineRenderer.widthMultiplier = initialWidthMultiplier; yield return new WaitForSeconds(0.2f);
+        }
+        blinkCoroutine = null;
+    }
+    public List<Vector3> GetWorldPoints() { return positions; }
 }
 */

@@ -1129,13 +1129,20 @@ MonoBehaviour:
   curveResolution: 50
   startOffset: 0.5
   innerCurveHeightFactor: 0.25
-  outerCurveHeightFactor: 0.5
+  leftOuterCurveHeightFactor: 1
+  bottomOuterCurveHeightFactor: 1
   neighborSqueezeAngleThreshold: 75
   neighborSqueezeHeightFactorMultiplier: 0.6
   outerToInnerSqueezeMultiplier: 0.4
   minMaxHeightFactorClamp: {x: 0.1, y: 0.7}
-  cubicP0ToCp1Offset: 10
-  cubicP3ToCp2Offset: 10
+  leftCubicP0ToCp1Offset: 3
+  leftCubicP3ToCp2Offset: 3
+  leftCubicCp1AngleOffset: -20
+  leftCubicCp2AngleOffset: -35
+  bottomCubicP0ToCp1Offset: 3
+  bottomCubicP3ToCp2Offset: 3
+  bottomCubicCp1AngleOffset: 20
+  bottomCubicCp2AngleOffset: 20
   targetKeys:
   - {fileID: 1552573102}
   - {fileID: 1120730205}
