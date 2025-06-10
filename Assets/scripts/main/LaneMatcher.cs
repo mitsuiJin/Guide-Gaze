@@ -8,6 +8,8 @@ public class LaneMatcher : MonoBehaviour
     [SerializeField] private GazeLineDrawer gazeLineDrawer;
     [SerializeField] private SquareMoverManager squareMoverManager;
 
+    [Range(0f, 1f)] public float alpha = 0.8f; // Frechet 가중치 비율 (0~1)
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -20,6 +22,7 @@ public class LaneMatcher : MonoBehaviour
 
     public void CompareAndFindClosestLane()
     {
+        // 필요한 컴포넌트 자동 탐색
         if (gazeLineDrawer == null)
             gazeLineDrawer = FindFirstObjectByType<GazeLineDrawer>();
         if (squareMoverManager == null)
@@ -33,6 +36,7 @@ public class LaneMatcher : MonoBehaviour
         List<Vector3> gazePath = gazeLineDrawer.GetGazePoints();
         List<float> timestamps = gazeLineDrawer.GetGazeTimestamps();
 
+        // 유효성 검사
         if (gazePath == null || gazePath.Count < 2 || timestamps == null || timestamps.Count < 2)
         {
             Debug.LogWarning("⚠️ Gaze 경로 또는 타임스탬프가 유효하지 않습니다.");
@@ -61,24 +65,21 @@ public class LaneMatcher : MonoBehaviour
 
             float laneSpeed = objectSpeeds[i];
 
-            // [1] Frechet 거리 계산
+            // [1] 프레셰 거리 계산 후 정규화
             float frechet = FrechetDistanceCalculator.Calculate(gazePath, lanePath);
+            float normFD = 1f - Mathf.Exp(-frechet); // 프레셰 거리 정규화 (작을수록 좋음)
 
-            // [2] 방향 포함 속도 차이 계산 (절댓값 X)
-            float speedDiff = gazeSpeed - laneSpeed;
+            // [2] 속도 유사도 계산 (1에 가까울수록 유사함)
+            float speedSim = Mathf.Exp(-Mathf.Abs(gazeSpeed - laneSpeed));
 
-            // [3] Z-score 정규화 (평균과 표준편차는 고정값 사용)
-            float zFrechet = (frechet - 0.5492f) / 0.1752f;
-            float zSpeedDiff = (speedDiff - (-0.0439f)) / 0.3927f;
+            // [3] 통합 유사도 점수 계산 (작을수록 유사함)
+            float adjusted = alpha * normFD + (1f - alpha) * (1f - speedSim);
 
-            // [4] 신뢰도 기반 가중 평균 (α = 0.834)
-            float matchError = 0.834f * zFrechet + 0.166f * zSpeedDiff;
+            Debug.Log($"🔍 {lane.name}: adjusted={adjusted:F3}, normFD={normFD:F3}, speedSim={speedSim:F3}, [gazeSpeed={gazeSpeed:F2}, laneSpeed={laneSpeed:F2}, α={alpha:F1}]");
 
-            Debug.Log($"🔍 {lane.name}: matchError={matchError:F3}, zFrechet={zFrechet:F3}, zSpeedDiff={zSpeedDiff:F3}, frechet={frechet:F3}, speedDiff={speedDiff:F3}, gazeSpeed={gazeSpeed:F2}, laneSpeed={laneSpeed:F2}");
-
-            if (matchError < minScore)
+            if (adjusted < minScore)
             {
-                minScore = matchError;
+                minScore = adjusted;
                 bestMatch = lane;
             }
         }
@@ -90,6 +91,9 @@ public class LaneMatcher : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 시선 경로의 평균 속도 계산 (전체 거리 / 전체 시간)
+    /// </summary>
     private float CalculatePathSpeed(List<Vector3> path, List<float> timestamps)
     {
         float totalDist = 0f;
