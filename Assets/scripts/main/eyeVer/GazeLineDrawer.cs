@@ -1,6 +1,4 @@
-﻿// GazeLineDrawer.cs
-
-using UnityEngine;
+﻿using UnityEngine;
 using Tobii.GameIntegration.Net;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -21,7 +19,7 @@ public class GazeLineDrawer : MonoBehaviour
     public LaneMatcher laneMatcher;
 
     [Header("Gaze 좌표 오프셋 (보정용)")]
-    [SerializeField] private Vector2 gazeOffset = new Vector2(0.5f, 0.15f);
+    [SerializeField] private Vector2 gazeOffset = Vector2.zero;
 
     public List<Vector3> GetGazePoints()
     {
@@ -71,14 +69,18 @@ public class GazeLineDrawer : MonoBehaviour
         if (!isTracking) return;
 
         TobiiGameIntegrationApi.Update();
-        GazePoint gp;
-        if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out gp))
+        if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out GazePoint gp))
         {
-            float x = Mathf.Clamp01(gp.X + gazeOffset.x);
-            float y = Mathf.Clamp01(gp.Y + gazeOffset.y);
+            // 오프셋 적용 및 -1~1 좌표계 기반 변환
+            float gx = gp.X + gazeOffset.x;
+            float gy = gp.Y + gazeOffset.y;
 
-            Vector3 screenPos = new Vector3(x * Screen.width, y * Screen.height, 10f);
-            Vector3 worldPos = Camera.main.ScreenToWorldPoint(screenPos);
+            float orthoSize = Camera.main.orthographicSize;
+            float aspect = Camera.main.aspect;
+
+            float worldX = gx * orthoSize * aspect;
+            float worldY = gy * orthoSize;
+            Vector3 worldPos = new Vector3(worldX, worldY, 0f);
 
             gazePoints.Add(worldPos);
             gazeTimestamps.Add(Time.time);
@@ -92,11 +94,11 @@ public class GazeLineDrawer : MonoBehaviour
             lineRenderer.positionCount = gazePoints.Count;
             lineRenderer.SetPositions(gazePoints.ToArray());
 
-            // 샘플링 간격 로그
+            // 디버깅 간격 로그 (옵션)
             if (gazeTimestamps.Count >= 2)
             {
                 float interval = gazeTimestamps[^1] - gazeTimestamps[^2];
-                //Debug.Log($"⏱ 시선 포인트 간격: {interval:F4}초");
+                // Debug.Log($"⏱ 시선 포인트 간격: {interval:F4}초");
             }
         }
     }

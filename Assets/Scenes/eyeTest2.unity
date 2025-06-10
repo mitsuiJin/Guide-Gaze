@@ -1129,10 +1129,20 @@ MonoBehaviour:
   curveResolution: 50
   startOffset: 0.5
   innerCurveHeightFactor: 0.25
-  outerCurveHeightFactor: 0.5
+  leftOuterCurveHeightFactor: 1
+  bottomOuterCurveHeightFactor: 1
   neighborSqueezeAngleThreshold: 75
   neighborSqueezeHeightFactorMultiplier: 0.6
+  outerToInnerSqueezeMultiplier: 0.4
   minMaxHeightFactorClamp: {x: 0.1, y: 0.7}
+  leftCubicP0ToCp1Offset: 1
+  leftCubicP3ToCp2Offset: 1
+  leftCubicCp1AngleOffset: 0
+  leftCubicCp2AngleOffset: 0
+  bottomCubicP0ToCp1Offset: 1
+  bottomCubicP3ToCp2Offset: 1
+  bottomCubicCp1AngleOffset: 0
+  bottomCubicCp2AngleOffset: 0
   targetKeys:
   - {fileID: 1552573102}
   - {fileID: 1120730205}
@@ -3874,6 +3884,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gazeLineDrawer: {fileID: 1176831113}
   squareMoverManager: {fileID: 180940681}
+  alpha: 0.8
 --- !u!4 &1787578043
 Transform:
   m_ObjectHideFlags: 0
