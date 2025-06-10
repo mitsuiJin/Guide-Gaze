@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 using System;
+using TMPro;
 
 // Helper class to define a key pattern
 [System.Serializable]
@@ -29,6 +30,10 @@ public class MultiLineRendererGenerator : MonoBehaviour
     public Transform ctrlKeyCenter;
     public List<Transform> allAvailableKeys;
     public Material lineMaterialTemplate;
+
+    [Header("UI")] // [추가] UI 관련 참조를 위한 헤더
+    public TextMeshProUGUI patternNameText; // [추가] TextMeshPro 오브젝트를 연결할 변수
+
 
     [Header("Curve Base Settings")]
     public int curveResolution = 20;
@@ -123,11 +128,37 @@ public class MultiLineRendererGenerator : MonoBehaviour
         else { Debug.LogError("[MLRG] allAvailableKeys list is not assigned!", this); }
         PopulateDefinedPatterns();
     }
-    void Start() { ProcessLaneGeneration(); }
+    void Start() { 
+        ProcessLaneGeneration();
+        UpdatePatternNameUI();
+    }
     void Update()
     { /* 이전과 동일 */
-        if (Input.GetKeyDown(regenerateKey)) { isInPatternMode = true; if (definedPatterns.Count > 0) { currentPatternIndex++; if (currentPatternIndex >= definedPatterns.Count) { currentPatternIndex = 0; } Debug.Log($"[MLRG] Applying pattern: {definedPatterns[currentPatternIndex].name} (Index: {currentPatternIndex})", this); } else { currentPatternIndex = -1; Debug.LogWarning("[MLRG] Regenerate key pressed, but no patterns are defined.", this); } ProcessLaneGeneration(); }
+        if (Input.GetKeyDown(regenerateKey)) { isInPatternMode = true; if (definedPatterns.Count > 0) { currentPatternIndex++; if (currentPatternIndex >= definedPatterns.Count) { currentPatternIndex = 0; } Debug.Log($"[MLRG] Applying pattern: {definedPatterns[currentPatternIndex].name} (Index: {currentPatternIndex})", this); 
+            } 
+            else { currentPatternIndex = -1; Debug.LogWarning("[MLRG] Regenerate key pressed, but no patterns are defined.", this); } 
+            ProcessLaneGeneration();
+            UpdatePatternNameUI();
+        }
+
     }
+    // [추가] 패턴 이름을 UI에 표시하는 함수
+    void UpdatePatternNameUI()
+    {
+        if (patternNameText == null) return; // UI 텍스트가 할당되지 않았으면 실행하지 않음
+
+        if (isInPatternMode && currentPatternIndex >= 0 && currentPatternIndex < definedPatterns.Count)
+        {
+            string currentPatternName = definedPatterns[currentPatternIndex].name;
+            patternNameText.text = "유형 이름: " + currentPatternName;
+        }
+        else
+        {
+            // 패턴 모드가 아니거나, 유효한 패턴이 없을 경우 기본 텍스트 표시
+            patternNameText.text = "유형 이름: 없음";
+        }
+    }
+
     void PopulateDefinedPatterns()
     { /* 이전과 동일 (사용자 제공 패턴 목록 사용) */
         definedPatterns.Clear();
