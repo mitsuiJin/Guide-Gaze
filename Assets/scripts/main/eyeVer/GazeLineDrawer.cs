@@ -71,16 +71,19 @@ public class GazeLineDrawer : MonoBehaviour
         TobiiGameIntegrationApi.Update();
         if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out GazePoint gp))
         {
-            // 오프셋 적용 및 -1~1 좌표계 기반 변환
-            float gx = gp.X + gazeOffset.x;
-            float gy = gp.Y + gazeOffset.y;
-
+            // 카메라 설정값 가져오기
             float orthoSize = Camera.main.orthographicSize;
             float aspect = Camera.main.aspect;
 
+            // 월드 오차 기준 보정 → 정규화 좌표계 보정으로 환산
+            float gx = gp.X + (gazeOffset.x / (orthoSize * aspect));
+            float gy = gp.Y + (gazeOffset.y / orthoSize);
+
+            // 월드 좌표로 변환
             float worldX = gx * orthoSize * aspect;
             float worldY = gy * orthoSize;
             Vector3 worldPos = new Vector3(worldX, worldY, 0f);
+
 
             gazePoints.Add(worldPos);
             gazeTimestamps.Add(Time.time);
