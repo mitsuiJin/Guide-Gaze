@@ -1,64 +1,49 @@
-using UnityEngine;
+Ôªøusing UnityEngine;
 using System.Collections.Generic;
-using System.Linq;
 
 public class LaneTracker : MonoBehaviour
 {
     public LineRenderer colorLaneRenderer;
-    public LineRenderer drawnLaneRenderer;
-    public float frechetDistanceThreshold = 0.1f; // ¡∂¡§ « ø‰
+    public MousePathDrawer mouseDrawer;
+    public float frechetDistanceThreshold = 0.1f;
 
-    private List<Vector3> drawnPoints = new List<Vector3>();
-    private bool isDrawing = false;
     private bool hasChecked = false;
 
     void Update()
     {
+        if (!mouseDrawer.isDrawing && !hasChecked && mouseDrawer.DrawnPoints.Count > 0)
+        {
+            CheckSimilarity();
+            hasChecked = true;
+        }
+
         if (Input.GetMouseButtonDown(0))
         {
-            isDrawing = true;
-            drawnPoints.Clear();
-            drawnLaneRenderer.positionCount = 0;
             hasChecked = false;
         }
+    }
 
-        if (isDrawing && Input.GetMouseButton(0))
+    void CheckSimilarity()
+    {
+        List<Vector3> drawnPoints = mouseDrawer.DrawnPoints;
+        List<Vector3> colorLanePoints = GetColorLanePoints();
+
+        if (colorLanePoints.Count == 0 || drawnPoints.Count == 0)
         {
-            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            mousePos.z = 0;
-            if (drawnPoints.Count == 0 || Vector3.Distance(drawnPoints.Last(), mousePos) > 0.01f)
-            {
-                drawnPoints.Add(mousePos);
-                drawnLaneRenderer.positionCount = drawnPoints.Count;
-                drawnLaneRenderer.SetPositions(drawnPoints.ToArray());
-            }
+            Debug.LogWarning("Color lane ÎòêÎäî Í∑∏Î†§ÏßÑ ÏÑ†Ïóê Ï†êÏù¥ ÏóÜÏäµÎãàÎã§.");
+            return;
         }
 
-        if (isDrawing && Input.GetMouseButtonUp(0) && !hasChecked)
+        float frechetDistance = CalculateFrechetDistance(colorLanePoints, drawnPoints);
+        Debug.Log("Frechet Distance: " + frechetDistance);
+
+        if (frechetDistance < frechetDistanceThreshold)
         {
-            List<Vector3> colorLanePoints = GetColorLanePoints();
-
-            if (colorLanePoints.Count > 0 && drawnPoints.Count > 0)
-            {
-                float frechetDistance = CalculateFrechetDistance(colorLanePoints, drawnPoints);
-                Debug.Log("Frechet Distance: " + frechetDistance);
-
-                if (frechetDistance < frechetDistanceThreshold)
-                {
-                    Debug.Log("Success: Drawn lane matches the color lane!");
-                }
-                else
-                {
-                    Debug.Log("Failed: The drawn lane does not match the color lane.");
-                }
-            }
-            else
-            {
-                Debug.LogWarning("Color lane ∂«¥¬ ±◊∑¡¡¯ º±ø° ¡°¿Ã æ¯Ω¿¥œ¥Ÿ.");
-            }
-
-            isDrawing = false;
-            hasChecked = true;
+            Debug.Log("‚úÖ Success: Drawn lane matches the color lane!");
+        }
+        else
+        {
+            Debug.Log("‚ùå Failed: The drawn lane does not match the color lane.");
         }
     }
 
@@ -80,31 +65,27 @@ public class LaneTracker : MonoBehaviour
             return float.MaxValue;
         }
 
-        // ∞≈∏Æ ∞ËªÍ ∞·∞˙∏¶ ¿˙¿Â«“ DP ≈◊¿Ã∫Ì
         float[,] dp = new float[n, m];
-
-        // √ ±‚∞™ ∞ËªÍ
         dp[0, 0] = Vector3.Distance(path1[0], path2[0]);
 
         for (int i = 1; i < n; i++)
-        {
             dp[i, 0] = Mathf.Max(dp[i - 1, 0], Vector3.Distance(path1[i], path2[0]));
-        }
 
         for (int j = 1; j < m; j++)
-        {
             dp[0, j] = Mathf.Max(dp[0, j - 1], Vector3.Distance(path1[0], path2[j]));
-        }
 
-        // DP ≈◊¿Ã∫Ì √§øÏ±‚
         for (int i = 1; i < n; i++)
         {
             for (int j = 1; j < m; j++)
             {
                 float cost = Vector3.Distance(path1[i], path2[j]);
-                dp[i, j] = Mathf.Min(Mathf.Max(dp[i - 1, j], cost),
-                                    Mathf.Min(Mathf.Max(dp[i, j - 1], cost),
-                                             Mathf.Max(dp[i - 1, j - 1], cost)));
+                dp[i, j] = Mathf.Min(
+                    Mathf.Max(dp[i - 1, j], cost),
+                    Mathf.Min(
+                        Mathf.Max(dp[i, j - 1], cost),
+                        Mathf.Max(dp[i - 1, j - 1], cost)
+                    )
+                );
             }
         }
 
