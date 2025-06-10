@@ -87,8 +87,13 @@ public class LaneMatcher : MonoBehaviour
             float frechet = FrechetDistanceCalculator.Calculate(gazePath, lanePath);
             float normFD = 1f - Mathf.Exp(-frechet); // 프레셰 거리 정규화 (작을수록 좋음)
 
-            // [2] 속도 유사도 계산 (1에 가까울수록 유사함)
-            float speedSim = Mathf.Exp(-Mathf.Abs(gazeSpeed - laneSpeed));
+            //// [2] 속도 유사도 계산 (1에 가까울수록 유사함)
+            //float speedSim = Mathf.Exp(-Mathf.Abs(gazeSpeed - laneSpeed));
+            float perceptualRatio = 0.8f;
+            float perceptualLaneSpeed = laneSpeed * perceptualRatio;
+            float speedSim = Mathf.Exp(-Mathf.Abs(gazeSpeed - perceptualLaneSpeed));
+
+
 
             // [3] 통합 유사도 점수 계산 (작을수록 유사함)
             float adjusted = alpha * normFD + (1f - alpha) * (1f - speedSim);
