@@ -1,65 +1,73 @@
 ﻿using UnityEngine;
+using System.Runtime.InteropServices;
 using Tobii.GameIntegration.Net;
-using System.Collections;
-using System.Diagnostics;
-using Debug = UnityEngine.Debug;
 
 public class GazeDebugger : MonoBehaviour
 {
-    private Vector3? lastGazePoint = null;
-    private float pointLifetime = 1f;
+    public GameObject debugDotPrefab;  // Inspector에서 지정한 노란색 점 프리팹
+    private GameObject debugDot;
+
+#if UNITY_STANDALONE_WIN
+    [DllImport("user32.dll")]
+    private static extern System.IntPtr GetActiveWindow();
+#endif
 
     void Start()
     {
-        TobiiGameIntegrationApi.SetApplicationName("MyUnityApp");
-        TobiiGameIntegrationApi.TrackWindow(Process.GetCurrentProcess().MainWindowHandle);
+#if UNITY_STANDALONE_WIN
+        var hwnd = GetActiveWindow();
+        TobiiGameIntegrationApi.SetApplicationName("MyUnityGazeApp");  // 고정된 앱 이름 지정
+        TobiiGameIntegrationApi.TrackWindow(hwnd);  // 현재 창 핸들 등록
+        Debug.Log($"[Tobii] 창 핸들 등록 완료: {hwnd}");
+#endif
+
+        Debug.Log($"[Tobii] API 초기화됨? {TobiiGameIntegrationApi.IsApiInitialized()}");
+        Debug.Log($"[Tobii] 트래커 연결됨? {TobiiGameIntegrationApi.IsTrackerConnected()}");
+
+        var info = TobiiGameIntegrationApi.GetTrackerInfo();
+        if (info != null)
+            Debug.Log($"[Tobii] 모델명: {info.ModelName}, 펌웨어: {info.FirmwareVersion}");
+        else
+            Debug.LogWarning("[Tobii] 트래커 정보를 불러올 수 없습니다.");
     }
 
     void Update()
     {
-        // 매 프레임 Tobii 업데이트 호출 필요
-        TobiiGameIntegrationApi.Update();
-
-        if (Input.GetKeyDown(KeyCode.T))
+        GazePoint gazePoint;
+        if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out gazePoint))
         {
-            if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out GazePoint gp))
+            float gazeX = gazePoint.X;
+            float gazeY = gazePoint.Y;
+
+            // 디버그 로그 출력
+            Debug.Log($"👁️ Gaze Norm({gazeX:F3}, {gazeY:F3})");
+
+            // -1~1 범위 → 스크린 픽셀 좌표로 변환
+            Vector3 screenPos = new Vector3(
+                (gazeX + 1f) * 0.5f * Screen.width,
+                (gazeY + 1f) * 0.5f * Screen.height,
+                10f // 카메라 앞 거리
+            );
+
+            // 월드 좌표로 변환
+            Vector3 worldPos = Camera.main.ScreenToWorldPoint(screenPos);
+            Debug.Log($"→ World ({worldPos.x:F2}, {worldPos.y:F2}, {worldPos.z:F2})");
+
+            // 디버그 점 찍기
+            if (debugDotPrefab != null)
             {
-                // 정규화된 시선 좌표 (0~1 범위)
-                float gx = gp.X;
-                float gy = gp.Y;
-
-                // 카메라 기준 범위 계산
-                // gp.X, gp.Y는 -1 ~ 1 기준이라고 가정
-                float orthoSize = Camera.main.orthographicSize;
-                float aspect = Camera.main.aspect;
-
-                float worldX = gp.X * orthoSize * aspect;
-                float worldY = gp.Y * orthoSize;
-               Vector3 worldPos = new Vector3(worldX, worldY, 0f);
-
-                Debug.Log($"👁️ Gaze Norm({gx:F3}, {gy:F3}) → World {worldPos}");
-
-                lastGazePoint = worldPos;
-                StartCoroutine(ClearAfterDelay(pointLifetime));
+                if (debugDot == null)
+                    debugDot = Instantiate(debugDotPrefab, worldPos, Quaternion.identity);
+                else
+                    debugDot.transform.position = worldPos;
             }
-            else
-            {
-                Debug.LogWarning("❗ Tobii 시선 좌표를 가져올 수 없습니다.");
-            }
+
+            // 선 그리기 (시각화용)
+            Debug.DrawLine(Camera.main.transform.position, worldPos, Color.yellow);
         }
-
-        // DrawRay는 Scene 뷰에서만 보임
-        if (lastGazePoint.HasValue)
+        else if (Time.frameCount % 20 == 0) // 너무 자주 찍지 않도록
         {
-            Vector3 p = lastGazePoint.Value;
-            Debug.DrawRay(p, Vector3.up * 0.1f, Color.yellow);
-            Debug.DrawRay(p, Vector3.right * 0.1f, Color.yellow);
+            Debug.LogWarning("❗ Tobii 시선 좌표를 가져올 수 없습니다.");
         }
-    }
-
-    IEnumerator ClearAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        lastGazePoint = null;
     }
 }
