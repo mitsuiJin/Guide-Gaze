@@ -12,43 +12,67 @@ public class GazeDebugger : MonoBehaviour
     void Start()
     {
         TobiiGameIntegrationApi.SetApplicationName("MyUnityApp");
-        TobiiGameIntegrationApi.TrackWindow(Process.GetCurrentProcess().MainWindowHandle);
+
+        // [1] Unity 창 추적 설정
+        var hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        bool trackResult = TobiiGameIntegrationApi.TrackWindow(hwnd);
+        Debug.Log("📺 TrackWindow 호출 결과: " + trackResult);
+
+        // [2] 스트림 유지 설정
+        TobiiGameIntegrationApi.UnsetAutoUnsubscribe(StreamType.Gaze);
+
+        // [3] 초기화 확인
+        bool ok = TobiiGameIntegrationApi.IsApiInitialized();
+        Debug.Log("✅ API 초기화 결과: " + ok);
+
+        var info = TobiiGameIntegrationApi.GetTrackerInfo();
+        if (info != null)
+        {
+            Debug.Log("✅ Tracker 연결됨: " + info.ModelName);
+        }
+        else
+        {
+            Debug.LogWarning("❌ Tracker 정보 없음");
+        }
     }
 
     void Update()
     {
-        // 매 프레임 Tobii 업데이트 호출 필요
+        // [필수] 매 프레임 API 갱신
         TobiiGameIntegrationApi.Update();
 
-        if (Input.GetKeyDown(KeyCode.T))
+        // 사용자 인식 안 되는 경우
+        if (!TobiiGameIntegrationApi.IsPresent())
         {
-            if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out GazePoint gp))
-            {
-                // 정규화된 시선 좌표 (0~1 범위)
-                float gx = gp.X;
-                float gy = gp.Y;
-
-                // 카메라 기준 범위 계산
-                // gp.X, gp.Y는 -1 ~ 1 기준이라고 가정
-                float orthoSize = Camera.main.orthographicSize;
-                float aspect = Camera.main.aspect;
-
-                float worldX = gp.X * orthoSize * aspect;
-                float worldY = gp.Y * orthoSize;
-               Vector3 worldPos = new Vector3(worldX, worldY, 0f);
-
-                Debug.Log($"👁️ Gaze Norm({gx:F3}, {gy:F3}) → World {worldPos}");
-
-                lastGazePoint = worldPos;
-                StartCoroutine(ClearAfterDelay(pointLifetime));
-            }
-            else
-            {
-                Debug.LogWarning("❗ Tobii 시선 좌표를 가져올 수 없습니다.");
-            }
+            Debug.LogWarning("🚫 사용자 인식 안 됨 (IsPresent = false)");
+            return;
         }
 
-        // DrawRay는 Scene 뷰에서만 보임
+        // 시선 좌표 가져오기
+        if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out GazePoint gp))
+        {
+            float gx = gp.X; // 정규화된 0~1 좌표
+            float gy = gp.Y;
+
+            // 정규화 → 월드좌표 (카메라 기준)
+            float orthoSize = Camera.main.orthographicSize;
+            float aspect = Camera.main.aspect;
+            float worldX = (gx - 0.5f) * orthoSize * 2f * aspect;
+            float worldY = (gy - 0.5f) * orthoSize * 2f;
+
+            Vector3 worldPos = new Vector3(worldX, worldY, 0f);
+
+            Debug.Log($"👁️ Gaze Norm({gx:F3}, {gy:F3}) → World {worldPos}");
+
+            lastGazePoint = worldPos;
+            StartCoroutine(ClearAfterDelay(pointLifetime));
+        }
+        else
+        {
+            Debug.LogWarning("❗ TryGetLatestGazePoint 실패: 시선 좌표 없음");
+        }
+
+        // 디버그 레이 표시
         if (lastGazePoint.HasValue)
         {
             Vector3 p = lastGazePoint.Value;
