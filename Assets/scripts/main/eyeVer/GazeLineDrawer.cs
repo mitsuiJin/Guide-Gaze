@@ -124,7 +124,7 @@ public class GazeLineDrawer : MonoBehaviour
     {
         isTracking = false;
         Debug.Log("🔻 시선 추적 정지 및 분석 준비 완료");
-        
+
         if (SquareMoverManager.Instance != null)
         {
             SquareMoverManager.Instance.ClearAllMovers();
@@ -144,5 +144,13 @@ public class GazeLineDrawer : MonoBehaviour
         {
             Debug.LogWarning("❗ LaneMatcher가 연결되지 않음");
         }
+    }
+    public void ForceStopTracking()
+    {
+        isTracking = false; // 추적 상태를 '꺼짐'으로 변경
+        gazePoints.Clear(); // 저장된 시선 경로 데이터 삭제
+        gazeTimestamps.Clear(); // 저장된 시간 데이터 삭제
+        lineRenderer.positionCount = 0; // 화면에 그려진 시선 라인 제거
+        Debug.Log("🔄 트랙 변경으로 인해 시선 추적 강제 정지");
     }
 }
