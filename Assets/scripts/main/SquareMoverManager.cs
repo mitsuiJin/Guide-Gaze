@@ -30,54 +30,54 @@ public class SquareMoverManager : MonoBehaviour
         Instance = this;
     }
 
-    private void OnEnable()
-    {
-        // 레인이 재생성될 때 이벤트 연결
-        MultiLineRendererGenerator.OnLanesRegenerated += HandleLanesRegenerated;
-    }
+    // private void OnEnable()
+    // {
+    //     // 레인이 재생성될 때 이벤트 연결
+    //     MultiLineRendererGenerator.OnLanesRegenerated += HandleLanesRegenerated;
+    // }
 
-    private void OnDisable()
-    {
-        // 비활성화 시 이벤트 해제 및 정리
-        MultiLineRendererGenerator.OnLanesRegenerated -= HandleLanesRegenerated;
-        ClearAllMovers();
-    }
+    // private void OnDisable()
+    // {
+    //     // 비활성화 시 이벤트 해제 및 정리
+    //     MultiLineRendererGenerator.OnLanesRegenerated -= HandleLanesRegenerated;
+    //     ClearAllMovers();
+    // }
 
-    private void Start()
-    {
-        // 시작 시 레인이 준비될 때까지 대기 후 네모 생성
-        StartCoroutine(InitialSetupMoversWhenReady());
-    }
+    // private void Start()
+    // {
+    //     // 시작 시 레인이 준비될 때까지 대기 후 네모 생성
+    //     StartCoroutine(InitialSetupMoversWhenReady());
+    // }
 
-    private void HandleLanesRegenerated()
-    {
-        // 레인이 재생성된 경우 한 프레임 대기 후 네모 재설정
-        StartCoroutine(ReinitializeMoversAfterFrame());
-    }
+    // private void HandleLanesRegenerated()
+    // {
+    //     // 레인이 재생성된 경우 한 프레임 대기 후 네모 재설정
+    //     StartCoroutine(ReinitializeMoversAfterFrame());
+    // }
 
-    private IEnumerator InitialSetupMoversWhenReady()
-    {
-        // ColorLaneManager 및 레인 준비될 때까지 대기
-        while (ColorLaneManager.Instance == null ||
-               ColorLaneManager.Instance.GetAllColorLanes() == null ||
-               ColorLaneManager.Instance.GetAllColorLanes().Count == 0)
-        {
-            yield return null;
-        }
+    // private IEnumerator InitialSetupMoversWhenReady()
+    // {
+    //     // ColorLaneManager 및 레인 준비될 때까지 대기
+    //     while (ColorLaneManager.Instance == null ||
+    //            ColorLaneManager.Instance.GetAllColorLanes() == null ||
+    //            ColorLaneManager.Instance.GetAllColorLanes().Count == 0)
+    //     {
+    //         yield return null;
+    //     }
 
-        SetupMovers();
-    }
+    //     SetupMovers();
+    // }
 
-    private IEnumerator ReinitializeMoversAfterFrame()
-    {
-        yield return null;
-        SetupMovers();
-    }
+    // private IEnumerator ReinitializeMoversAfterFrame()
+    // {
+    //     yield return null;
+    //     SetupMovers();
+    // }
 
     /// <summary>
     /// 기존 네모 삭제 및 코루틴 정리
     /// </summary>
-    private void ClearAllMovers()
+    public void ClearAllMovers()
     {
         foreach (var coroutine in activeMoveCoroutines)
         {
@@ -98,8 +98,12 @@ public class SquareMoverManager : MonoBehaviour
     /// <summary>
     /// 레인 정보를 기반으로 네모 생성 및 속도 설정
     /// </summary>
-    private void SetupMovers()
+    public void SetupMovers()
     {
+        // [추가] 레인 데이터가 준비되었는지 확인하는 로직을 여기에 넣거나,
+        // GazeLineDrawer에서 호출하기 전에 레인이 준비되었다고 가정합니다.
+        // 여기서는 준비되었다고 가정하고 진행합니다.
+        
         ClearAllMovers();
 
         var lanes = ColorLaneManager.Instance.GetAllColorLanes();
@@ -111,21 +115,17 @@ public class SquareMoverManager : MonoBehaviour
 
         currentLaneSpeeds = new float[lanes.Count];
 
-        // 레인 길이 기준 내림차순 정렬 (가장 긴 레인이 가장 먼저)
         var sortedLanes = lanes
             .Select(l => new { lane = l, length = GetPathLength(l.positions) })
             .OrderByDescending(l => l.length)
             .ToList();
 
-        // 정렬된 레인에 대해 빠른 속도부터 순서대로 할당
         for (int i = 0; i < sortedLanes.Count; i++)
         {
             var laneInfo = sortedLanes[i].lane;
-
-            // 길이가 긴 순서이므로 속도는 역순으로 할당 (긴 애가 느리게, 짧은 애가 빠르게 X)
             float assignedSpeed = (i < predefinedSpeeds.Length)
                 ? predefinedSpeeds[predefinedSpeeds.Length - 1 - i]
-                : predefinedSpeeds.First(); // 초과 시 가장 느린 속도 재사용
+                : predefinedSpeeds.First();
 
             int originalIndex = lanes.IndexOf(laneInfo);
             if (originalIndex >= 0 && originalIndex < currentLaneSpeeds.Length)
@@ -133,7 +133,6 @@ public class SquareMoverManager : MonoBehaviour
 
             CreateAndMoveSquare(laneInfo, assignedSpeed, originalIndex);
         }
-
     }
 
     /// <summary>

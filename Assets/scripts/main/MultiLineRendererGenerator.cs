@@ -134,8 +134,18 @@ public class MultiLineRendererGenerator : MonoBehaviour
     }
     void Update()
     { /* 이전과 동일 */
-        if (Input.GetKeyDown(regenerateKey)) { isInPatternMode = true; if (definedPatterns.Count > 0) { currentPatternIndex++; if (currentPatternIndex >= definedPatterns.Count) { currentPatternIndex = 0; } Debug.Log($"[MLRG] Applying pattern: {definedPatterns[currentPatternIndex].name} (Index: {currentPatternIndex})", this); 
-            } 
+        if (Input.GetKeyDown(regenerateKey)) {
+            isInPatternMode = true;
+            if (SquareMoverManager.Instance != null)
+            {
+                SquareMoverManager.Instance.ClearAllMovers();
+            }
+
+            if (definedPatterns.Count > 0)
+            {
+                currentPatternIndex++; if (currentPatternIndex >= definedPatterns.Count) { currentPatternIndex = 0; }
+                Debug.Log($"[MLRG] Applying pattern: {definedPatterns[currentPatternIndex].name} (Index: {currentPatternIndex})", this);
+            }
             else { currentPatternIndex = -1; Debug.LogWarning("[MLRG] Regenerate key pressed, but no patterns are defined.", this); } 
             ProcessLaneGeneration();
             UpdatePatternNameUI();

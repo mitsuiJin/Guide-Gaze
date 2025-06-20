@@ -113,12 +113,23 @@ public class GazeLineDrawer : MonoBehaviour
         gazeTimestamps.Clear();
         lineRenderer.positionCount = 0;
         Debug.Log("🔺 시선 추적 시작");
+
+        if (SquareMoverManager.Instance != null)
+        {
+            SquareMoverManager.Instance.SetupMovers();
+        }
     }
 
     void EndTracking()
     {
         isTracking = false;
         Debug.Log("🔻 시선 추적 정지 및 분석 준비 완료");
+        
+        if (SquareMoverManager.Instance != null)
+        {
+            SquareMoverManager.Instance.ClearAllMovers();
+        }
+
 
         if (laneMatcher == null)
         {
