@@ -1,89 +1,73 @@
 ﻿using UnityEngine;
+using System.Runtime.InteropServices;
 using Tobii.GameIntegration.Net;
-using System.Collections;
-using System.Diagnostics;
-using Debug = UnityEngine.Debug;
 
 public class GazeDebugger : MonoBehaviour
 {
-    private Vector3? lastGazePoint = null;
-    private float pointLifetime = 1f;
+    public GameObject debugDotPrefab;  // Inspector에서 지정한 노란색 점 프리팹
+    private GameObject debugDot;
+
+#if UNITY_STANDALONE_WIN
+    [DllImport("user32.dll")]
+    private static extern System.IntPtr GetActiveWindow();
+#endif
 
     void Start()
     {
-        TobiiGameIntegrationApi.SetApplicationName("MyUnityApp");
+#if UNITY_STANDALONE_WIN
+        var hwnd = GetActiveWindow();
+        TobiiGameIntegrationApi.SetApplicationName("MyUnityGazeApp");  // 고정된 앱 이름 지정
+        TobiiGameIntegrationApi.TrackWindow(hwnd);  // 현재 창 핸들 등록
+        Debug.Log($"[Tobii] 창 핸들 등록 완료: {hwnd}");
+#endif
 
-        // [1] Unity 창 추적 설정
-        var hwnd = Process.GetCurrentProcess().MainWindowHandle;
-        bool trackResult = TobiiGameIntegrationApi.TrackWindow(hwnd);
-        Debug.Log("📺 TrackWindow 호출 결과: " + trackResult);
-
-        // [2] 스트림 유지 설정
-        TobiiGameIntegrationApi.UnsetAutoUnsubscribe(StreamType.Gaze);
-
-        // [3] 초기화 확인
-        bool ok = TobiiGameIntegrationApi.IsApiInitialized();
-        Debug.Log("✅ API 초기화 결과: " + ok);
+        Debug.Log($"[Tobii] API 초기화됨? {TobiiGameIntegrationApi.IsApiInitialized()}");
+        Debug.Log($"[Tobii] 트래커 연결됨? {TobiiGameIntegrationApi.IsTrackerConnected()}");
 
         var info = TobiiGameIntegrationApi.GetTrackerInfo();
         if (info != null)
-        {
-            Debug.Log("✅ Tracker 연결됨: " + info.ModelName);
-        }
+            Debug.Log($"[Tobii] 모델명: {info.ModelName}, 펌웨어: {info.FirmwareVersion}");
         else
-        {
-            Debug.LogWarning("❌ Tracker 정보 없음");
-        }
+            Debug.LogWarning("[Tobii] 트래커 정보를 불러올 수 없습니다.");
     }
 
     void Update()
     {
-        // [필수] 매 프레임 API 갱신
-        TobiiGameIntegrationApi.Update();
-
-        // 사용자 인식 안 되는 경우
-        if (!TobiiGameIntegrationApi.IsPresent())
+        GazePoint gazePoint;
+        if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out gazePoint))
         {
-            Debug.LogWarning("🚫 사용자 인식 안 됨 (IsPresent = false)");
-            return;
-        }
+            float gazeX = gazePoint.X;
+            float gazeY = gazePoint.Y;
 
-        // 시선 좌표 가져오기
-        if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out GazePoint gp))
+            // 디버그 로그 출력
+            Debug.Log($"👁️ Gaze Norm({gazeX:F3}, {gazeY:F3})");
+
+            // -1~1 범위 → 스크린 픽셀 좌표로 변환
+            Vector3 screenPos = new Vector3(
+                (gazeX + 1f) * 0.5f * Screen.width,
+                (gazeY + 1f) * 0.5f * Screen.height,
+                10f // 카메라 앞 거리
+            );
+
+            // 월드 좌표로 변환
+            Vector3 worldPos = Camera.main.ScreenToWorldPoint(screenPos);
+            Debug.Log($"→ World ({worldPos.x:F2}, {worldPos.y:F2}, {worldPos.z:F2})");
+
+            // 디버그 점 찍기
+            if (debugDotPrefab != null)
+            {
+                if (debugDot == null)
+                    debugDot = Instantiate(debugDotPrefab, worldPos, Quaternion.identity);
+                else
+                    debugDot.transform.position = worldPos;
+            }
+
+            // 선 그리기 (시각화용)
+            Debug.DrawLine(Camera.main.transform.position, worldPos, Color.yellow);
+        }
+        else if (Time.frameCount % 20 == 0) // 너무 자주 찍지 않도록
         {
-            float gx = gp.X; // 정규화된 0~1 좌표
-            float gy = gp.Y;
-
-            // 정규화 → 월드좌표 (카메라 기준)
-            float orthoSize = Camera.main.orthographicSize;
-            float aspect = Camera.main.aspect;
-            float worldX = (gx - 0.5f) * orthoSize * 2f * aspect;
-            float worldY = (gy - 0.5f) * orthoSize * 2f;
-
-            Vector3 worldPos = new Vector3(worldX, worldY, 0f);
-
-            Debug.Log($"👁️ Gaze Norm({gx:F3}, {gy:F3}) → World {worldPos}");
-
-            lastGazePoint = worldPos;
-            StartCoroutine(ClearAfterDelay(pointLifetime));
+            Debug.LogWarning("❗ Tobii 시선 좌표를 가져올 수 없습니다.");
         }
-        else
-        {
-            Debug.LogWarning("❗ TryGetLatestGazePoint 실패: 시선 좌표 없음");
-        }
-
-        // 디버그 레이 표시
-        if (lastGazePoint.HasValue)
-        {
-            Vector3 p = lastGazePoint.Value;
-            Debug.DrawRay(p, Vector3.up * 0.1f, Color.yellow);
-            Debug.DrawRay(p, Vector3.right * 0.1f, Color.yellow);
-        }
-    }
-
-    IEnumerator ClearAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        lastGazePoint = null;
     }
 }
