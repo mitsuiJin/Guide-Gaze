@@ -1,22 +1,34 @@
 ﻿// LaneMatcher.cs
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro; // [추가] TextMeshPro를 사용하기 위해 네임스페이스를 추가합니다.
+using TMPro;
+using System.Linq;
 
 public class LaneMatcher : MonoBehaviour
 {
     public static LaneMatcher Instance { get; private set; }
 
-    [Header("Component References")] // [수정] 헤더 이름 변경
+    // [추가] 각 레인별 UI 텍스트를 묶어서 관리하기 위한 클래스
+    [System.Serializable]
+    public class LaneUITargets
+    {
+        public string laneDirectionName; // 인스펙터에서 알아보기 쉽게 이름 부여 (e.g., "Right", "Top")
+        public TextMeshProUGUI frechetText;
+        public TextMeshProUGUI speedText;
+    }
+
+    [Header("Component References")]
     [SerializeField] private GazeLineDrawer gazeLineDrawer;
     [SerializeField] private SquareMoverManager squareMoverManager;
 
-    [Header("UI References")] // [추가] UI 참조를 위한 헤더
-    [SerializeField] private TextMeshProUGUI frechetResultText; // [추가] 프레셰 결과 표시용 텍스트
-    [SerializeField] private TextMeshProUGUI speedResultText; // [추가] 속도 유사도 결과 표시용 텍스트
+    [Header("UI References")]
+    // [수정] 4개의 레인 UI를 관리할 리스트. 인스펙터에서 크기를 4로 설정하고 순서대로 할당해야 합니다.
+    // 순서: 0=Right, 1=Top, 2=Left, 3=Bottom
+    [SerializeField] private List<LaneUITargets> laneUIs = new List<LaneUITargets>(4); 
+    [SerializeField] private TextMeshProUGUI bestMatchText; // [추가] 최종 선택된 레인을 표시할 텍스트
 
-    [Header("Matching Settings")] // [수정] 헤더 이름 변경
-    [Range(0f, 1f)] public float alpha = 0.8f; // Frechet 가중치 비율 (0~1)
+    [Header("Matching Settings")]
+    [Range(0f, 1f)] public float alpha = 0.8f;
 
     private void Awake()
     {
@@ -28,7 +40,6 @@ public class LaneMatcher : MonoBehaviour
         Instance = this;
     }
 
-    // [추가] 프로그램 시작 시 또는 비교 시작 전에 UI 텍스트를 초기화하는 함수
     private void Start()
     {
         ClearResultTexts();
@@ -36,11 +47,9 @@ public class LaneMatcher : MonoBehaviour
 
     public void CompareAndFindClosestLane()
     {
-        // 필요한 컴포넌트 자동 탐색
-        if (gazeLineDrawer == null)
-            gazeLineDrawer = FindFirstObjectByType<GazeLineDrawer>();
-        if (squareMoverManager == null)
-            squareMoverManager = FindFirstObjectByType<SquareMoverManager>();
+        if (gazeLineDrawer == null) gazeLineDrawer = FindFirstObjectByType<GazeLineDrawer>();
+        if (squareMoverManager == null) squareMoverManager = FindFirstObjectByType<SquareMoverManager>();
+        
         if (gazeLineDrawer == null || squareMoverManager == null)
         {
             Debug.LogError("❌ 필수 컴포넌트가 누락되었습니다.");
@@ -50,11 +59,10 @@ public class LaneMatcher : MonoBehaviour
         List<Vector3> gazePath = gazeLineDrawer.GetGazePoints();
         List<float> timestamps = gazeLineDrawer.GetGazeTimestamps();
 
-        // 유효성 검사
         if (gazePath == null || gazePath.Count < 2 || timestamps == null || timestamps.Count < 2)
         {
             Debug.LogWarning("⚠️ Gaze 경로 또는 타임스탬프가 유효하지 않습니다.");
-            ClearResultTexts(); // [추가] 유효하지 않을 때도 텍스트 초기화
+            ClearResultTexts();
             return;
         }
 
@@ -64,20 +72,27 @@ public class LaneMatcher : MonoBehaviour
         if (colorLanes == null || colorLanes.Count == 0 || objectSpeeds == null || objectSpeeds.Length != colorLanes.Count)
         {
             Debug.LogError("❌ ColorLane 또는 속도 배열 문제가 있습니다.");
-            ClearResultTexts(); // [추가] 유효하지 않을 때도 텍스트 초기화
+            ClearResultTexts();
             return;
         }
+
+        ClearResultTexts(); // 비교 시작 전 모든 텍스트 초기화
 
         float gazeSpeed = CalculatePathSpeed(gazePath, timestamps);
 
         float minScore = float.MaxValue;
-        ColorLaneInfo bestMatch = null;
-        float bestNormFD = -1f; // [추가] 최고 점수의 정규화된 프레셰 값을 저장할 변수
-        float bestSpeedSim = -1f; // [추가] 최고 점수의 속도 유사도 값을 저장할 변수
+        ColorLaneInfo bestMatchLane = null;
+        int bestMatchSlotIndex = -1;
 
-        for (int i = 0; i < colorLanes.Count; i++)
+        // colorLanes 리스트의 순서가 보장되지 않으므로, slotIndex를 키로 하는 딕셔너리로 재정렬합니다.
+        Dictionary<int, ColorLaneInfo> lanesBySlot = colorLanes.ToDictionary(lane => lane.slotIndex, lane => lane);
+
+        for (int i = 0; i < laneUIs.Count; i++)
         {
-            var lane = colorLanes[i];
+            // i는 UI 슬롯 인덱스 (0=R, 1=T, 2=L, 3=B)
+            if (!lanesBySlot.ContainsKey(i)) continue; // 해당 슬롯에 레인이 없으면 건너뛰기
+
+            var lane = lanesBySlot[i];
             var lanePath = lane.GetWorldPoints();
             if (lanePath == null || lanePath.Count < 2) continue;
 
@@ -85,48 +100,39 @@ public class LaneMatcher : MonoBehaviour
 
             // [1] 프레셰 거리 계산 후 정규화
             float frechet = FrechetDistanceCalculator.Calculate(gazePath, lanePath);
-            float normFD = 1f - Mathf.Exp(-frechet); // 프레셰 거리 정규화 (작을수록 좋음)
+            float normFD = 1f - Mathf.Exp(-frechet);
 
-            //// [2] 속도 유사도 계산 (1에 가까울수록 유사함)
-            //float speedSim = Mathf.Exp(-Mathf.Abs(gazeSpeed - laneSpeed));
+            // [2] 속도 유사도 계산
             float perceptualRatio = 0.8f;
             float perceptualLaneSpeed = laneSpeed * perceptualRatio;
             float speedSim = Mathf.Exp(-Mathf.Abs(gazeSpeed - perceptualLaneSpeed));
 
-
-
-            // [3] 통합 유사도 점수 계산 (작을수록 유사함)
+            // [3] 통합 유사도 점수 계산
             float adjusted = alpha * normFD + (1f - alpha) * (1f - speedSim);
 
-            Debug.Log($"🔍 {lane.name}: adjusted={adjusted:F3}, normFD={normFD:F3}, speedSim={speedSim:F3}, [gazeSpeed={gazeSpeed:F2}, laneSpeed={laneSpeed:F2}, α={alpha:F1}]");
+            Debug.Log($"🔍 {lane.name} (Slot {i}): adjusted={adjusted:F3}, normFD={normFD:F3}, speedSim={speedSim:F3}");
+
+            // [수정] 계산 결과를 즉시 해당 슬롯의 UI에 업데이트
+            UpdateSingleLaneText(i, normFD, speedSim);
 
             if (adjusted < minScore)
             {
                 minScore = adjusted;
-                bestMatch = lane;
-                bestNormFD = normFD;       // [추가] 최고 점수일 때의 프레셰 값 저장
-                bestSpeedSim = speedSim;   // [추가] 최고 점수일 때의 속도 유사도 값 저장
+                bestMatchLane = lane;
+                bestMatchSlotIndex = i;
             }
         }
 
-        if (bestMatch != null)
+        if (bestMatchLane != null)
         {
-            bestMatch.Highlight(true);
-            Debug.Log($"✅ 최종 선택된 레인: {bestMatch.name}");
+            bestMatchLane.Highlight(true);
+            Debug.Log($"✅ 최종 선택된 레인: {bestMatchLane.name} (Slot: {bestMatchSlotIndex})");
             
-            // [추가] 최종 선택된 레인의 결과값을 UI 텍스트로 업데이트
-            UpdateResultTexts(bestNormFD, bestSpeedSim);
-        }
-        else
-        {
-            // [추가] 일치하는 레인이 없을 경우 UI 텍스트 초기화
-            ClearResultTexts();
+            // [추가] 최종 선택된 레인 정보 업데이트
+            UpdateBestMatchText(bestMatchSlotIndex);
         }
     }
 
-    /// <summary>
-    /// 시선 경로의 평균 속도 계산 (전체 거리 / 전체 시간)
-    /// </summary>
     private float CalculatePathSpeed(List<Vector3> path, List<float> timestamps)
     {
         float totalDist = 0f;
@@ -138,31 +144,50 @@ public class LaneMatcher : MonoBehaviour
         return totalTime > 0 ? totalDist / totalTime : 0f;
     }
 
-    // [추가] 결과 텍스트를 업데이트하는 함수
-    private void UpdateResultTexts(float normFD, float speedSim)
+    // [추가] 특정 레인의 UI 텍스트만 업데이트하는 함수
+    private void UpdateSingleLaneText(int slotIndex, float normFD, float speedSim)
     {
-        if (frechetResultText != null)
+        if (slotIndex < 0 || slotIndex >= laneUIs.Count) return;
+
+        var ui = laneUIs[slotIndex];
+        if (ui.frechetText != null)
         {
-            // normFD는 '비유사도'이므로 0에 가까울수록 모양이 유사합니다.
-            frechetResultText.text = $"프레셰 거리: {normFD:F3}";
+            ui.frechetText.text = $"{ui.laneDirectionName} 프레셰 거리: {normFD:F3}";
         }
-        if (speedResultText != null)
+        if (ui.speedText != null)
         {
-            // speedSim은 '유사도'이므로 1에 가까울수록 속도가 유사합니다.
-            speedResultText.text = $"속도 유사도: {speedSim:F3}";
+            ui.speedText.text = $"{ui.laneDirectionName} 속도 유사도: {speedSim:F3}";
         }
     }
 
-    // [추가] 결과 텍스트를 초기 상태로 되돌리는 함수
+    // [추가] 최종 선택된 레인의 방향을 텍스트로 표시하는 함수
+    private void UpdateBestMatchText(int slotIndex)
+    {
+        if (bestMatchText == null) return;
+
+        string directionName = "알 수 없음";
+        switch (slotIndex)
+        {
+            case 0: directionName = "Right"; break;
+            case 1: directionName = "Top"; break;
+            case 2: directionName = "Left"; break;
+            case 3: directionName = "Bottom"; break;
+        }
+        bestMatchText.text = $"선택: {directionName}";
+    }
+
+    // [수정] 모든 UI 텍스트를 초기화하는 함수
     private void ClearResultTexts()
     {
-        if (frechetResultText != null)
+        foreach (var ui in laneUIs)
         {
-            frechetResultText.text = "프레셰 거리: -";
+            if (ui.frechetText != null) ui.frechetText.text = $"{ui.laneDirectionName} 프레셰 거리: -";
+            if (ui.speedText != null) ui.speedText.text = $"{ui.laneDirectionName} 속도 유사도: -";
         }
-        if (speedResultText != null)
+
+        if (bestMatchText != null)
         {
-            speedResultText.text = "속도 유사도: -";
+            bestMatchText.text = "선택: -";
         }
     }
 }
