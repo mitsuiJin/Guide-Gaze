@@ -71,16 +71,19 @@ public class GazeLineDrawer : MonoBehaviour
         TobiiGameIntegrationApi.Update();
         if (TobiiGameIntegrationApi.TryGetLatestGazePoint(out GazePoint gp))
         {
-            // 오프셋 적용 및 -1~1 좌표계 기반 변환
-            float gx = gp.X + gazeOffset.x;
-            float gy = gp.Y + gazeOffset.y;
-
+            // 카메라 설정값 가져오기
             float orthoSize = Camera.main.orthographicSize;
             float aspect = Camera.main.aspect;
 
+            // 월드 오차 기준 보정 → 정규화 좌표계 보정으로 환산
+            float gx = gp.X + (gazeOffset.x / (orthoSize * aspect));
+            float gy = gp.Y + (gazeOffset.y / orthoSize);
+
+            // 월드 좌표로 변환
             float worldX = gx * orthoSize * aspect;
             float worldY = gy * orthoSize;
             Vector3 worldPos = new Vector3(worldX, worldY, 0f);
+
 
             gazePoints.Add(worldPos);
             gazeTimestamps.Add(Time.time);
@@ -110,12 +113,23 @@ public class GazeLineDrawer : MonoBehaviour
         gazeTimestamps.Clear();
         lineRenderer.positionCount = 0;
         Debug.Log("🔺 시선 추적 시작");
+
+        if (SquareMoverManager.Instance != null)
+        {
+            SquareMoverManager.Instance.SetupMovers();
+        }
     }
 
     void EndTracking()
     {
         isTracking = false;
         Debug.Log("🔻 시선 추적 정지 및 분석 준비 완료");
+
+        if (SquareMoverManager.Instance != null)
+        {
+            SquareMoverManager.Instance.ClearAllMovers();
+        }
+
 
         if (laneMatcher == null)
         {
@@ -130,5 +144,13 @@ public class GazeLineDrawer : MonoBehaviour
         {
             Debug.LogWarning("❗ LaneMatcher가 연결되지 않음");
         }
+    }
+    public void ForceStopTracking()
+    {
+        isTracking = false; // 추적 상태를 '꺼짐'으로 변경
+        gazePoints.Clear(); // 저장된 시선 경로 데이터 삭제
+        gazeTimestamps.Clear(); // 저장된 시간 데이터 삭제
+        lineRenderer.positionCount = 0; // 화면에 그려진 시선 라인 제거
+        Debug.Log("🔄 트랙 변경으로 인해 시선 추적 강제 정지");
     }
 }

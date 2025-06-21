@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class ColorLaneInfo : MonoBehaviour
 {
+    public string keyName;
     public List<Vector3> positions = new List<Vector3>();
     [HideInInspector] public LineRenderer lineRenderer;
 

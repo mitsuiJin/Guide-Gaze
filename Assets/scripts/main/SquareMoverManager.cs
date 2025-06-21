@@ -1,28 +1,27 @@
-﻿// SquareMoverManager.cs
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq; // LINQ를 사용하여 정렬
 
 public class SquareMoverManager : MonoBehaviour
 {
+    // 싱글톤 패턴: 다른 스크립트에서 쉽게 접근 가능하게 함
     public static SquareMoverManager Instance { get; private set; }
 
     [Header("Square Properties")]
-    public Sprite squareSprite;
-    public bool matchLineColor = true;
-    public float sizeMultiplier = 1.5f;
+    public Sprite squareSprite;            // 사용할 Sprite 이미지
+    public bool matchLineColor = true;     // 해당 레인의 색상을 네모에 적용할지 여부
+    public float sizeMultiplier = 1.5f;    // 네모 크기 조절 계수 (라인 굵기 기준)
 
     [Header("Movement Settings")]
-    // 각 레인별 네모의 속도 (참고용으로 Inspector에 표시될 수 있음)
-    public float[] currentLaneSpeeds;
-    // 미리 정의된 속도 세트 (4개의 레인에 순서대로 할당됨)
-    public float[] predefinedSpeeds = new float[4] { 2.5f, 3.0f, 3.5f, 4.0f };
+    public float[] currentLaneSpeeds;      // 각 레인에 실제 할당된 속도 정보
+    public float[] predefinedSpeeds = new float[4] { 4.0f, 3.5f, 3.0f, 2.5f }; // 속도 우선순위 배열
 
-
-    private List<Coroutine> activeMoveCoroutines = new List<Coroutine>();
+    private List<Coroutine> activeMoveCoroutines = new List<Coroutine>(); // 현재 실행 중인 이동 코루틴 목록
 
     private void Awake()
     {
+        // 싱글톤 초기화
         if (Instance != null && Instance != this)
         {
             Destroy(this.gameObject);
@@ -31,79 +30,62 @@ public class SquareMoverManager : MonoBehaviour
         Instance = this;
     }
 
-    private void OnEnable()
-    {
-        // MultiLineRendererGenerator의 이벤트 구독
-        MultiLineRendererGenerator.OnLanesRegenerated += HandleLanesRegenerated;
-        // Debug.Log("[SquareMoverManager] Subscribed to OnLanesRegenerated event.");
-    }
+    // private void OnEnable()
+    // {
+    //     // 레인이 재생성될 때 이벤트 연결
+    //     MultiLineRendererGenerator.OnLanesRegenerated += HandleLanesRegenerated;
+    // }
 
-    private void OnDisable()
-    {
-        // 이벤트 구독 해제
-        MultiLineRendererGenerator.OnLanesRegenerated -= HandleLanesRegenerated;
-        // Debug.Log("[SquareMoverManager] Unsubscribed from OnLanesRegenerated event.");
-        ClearAllMovers(); // 오브젝트 비활성화/파괴 시 정리
-    }
+    // private void OnDisable()
+    // {
+    //     // 비활성화 시 이벤트 해제 및 정리
+    //     MultiLineRendererGenerator.OnLanesRegenerated -= HandleLanesRegenerated;
+    //     ClearAllMovers();
+    // }
 
-    private void Start()
-    {
-        // 초기 네모 생성 (ColorLaneManager가 준비될 때까지 대기)
-        StartCoroutine(InitialSetupMoversWhenReady());
-    }
+    // private void Start()
+    // {
+    //     // 시작 시 레인이 준비될 때까지 대기 후 네모 생성
+    //     StartCoroutine(InitialSetupMoversWhenReady());
+    // }
+
+    // private void HandleLanesRegenerated()
+    // {
+    //     // 레인이 재생성된 경우 한 프레임 대기 후 네모 재설정
+    //     StartCoroutine(ReinitializeMoversAfterFrame());
+    // }
+
+    // private IEnumerator InitialSetupMoversWhenReady()
+    // {
+    //     // ColorLaneManager 및 레인 준비될 때까지 대기
+    //     while (ColorLaneManager.Instance == null ||
+    //            ColorLaneManager.Instance.GetAllColorLanes() == null ||
+    //            ColorLaneManager.Instance.GetAllColorLanes().Count == 0)
+    //     {
+    //         yield return null;
+    //     }
+
+    //     SetupMovers();
+    // }
+
+    // private IEnumerator ReinitializeMoversAfterFrame()
+    // {
+    //     yield return null;
+    //     SetupMovers();
+    // }
 
     /// <summary>
-    /// MultiLineRendererGenerator에서 레인이 재생성되었다는 이벤트를 처리합니다.
+    /// 기존 네모 삭제 및 코루틴 정리
     /// </summary>
-    private void HandleLanesRegenerated()
+    public void ClearAllMovers()
     {
-        // Debug.Log("[SquareMoverManager] Received OnLanesRegenerated event. Re-initializing movers.");
-        // 새 라인이 완전히 준비될 수 있도록 한 프레임 대기 후 실행 (안정성 확보)
-        StartCoroutine(ReinitializeMoversAfterFrame());
-    }
-
-    /// <summary>
-    /// 게임 시작 시 또는 초기 레인이 준비되었을 때 네모들을 설정하는 코루틴입니다.
-    /// </summary>
-    private IEnumerator InitialSetupMoversWhenReady()
-    {
-        // ColorLaneManager와 해당 레인이 준비될 때까지 대기
-        // OnLanesRegenerated 이벤트가 Start보다 먼저 발생할 수도 있으므로, 이 대기는 여전히 유용합니다.
-        while (ColorLaneManager.Instance == null ||
-               ColorLaneManager.Instance.GetAllColorLanes() == null ||
-               ColorLaneManager.Instance.GetAllColorLanes().Count == 0)
+        foreach (var coroutine in activeMoveCoroutines)
         {
-            yield return null; // 다음 프레임까지 대기
+            if (coroutine != null) StopCoroutine(coroutine);
         }
-        // Debug.Log("[SquareMoverManager] Initial lanes are ready or detected. Proceeding with SetupMovers.");
-        SetupMovers();
-    }
+        activeMoveCoroutines.Clear();
 
-    /// <summary>
-    /// 레인 재생성 이벤트 후 한 프레임 대기하고 네모들을 재설정합니다.
-    /// </summary>
-    private IEnumerator ReinitializeMoversAfterFrame()
-    {
-        yield return null; // 다음 프레임까지 대기하여 새 레인 정보가 완전히 반영되도록 함
-        SetupMovers();
-    }
-
-    /// <summary>
-    /// 모든 기존 네모와 관련 코루틴을 정리합니다.
-    /// </summary>
-    private void ClearAllMovers()
-    {
-        // Debug.Log("[SquareMoverManager] Clearing all existing movers...");
-        if (activeMoveCoroutines != null)
-        {
-            foreach (var coroutine in activeMoveCoroutines)
-            {
-                if (coroutine != null) StopCoroutine(coroutine);
-            }
-            activeMoveCoroutines.Clear();
-        }
-
-        // SquareMoverManager의 자식으로 있는 모든 MovingSquare 오브젝트 삭제
+        // "MovingSquare_"로 시작하는 모든 자식 오브젝트 제거
         foreach (Transform child in transform)
         {
             if (child.gameObject.name.StartsWith("MovingSquare_"))
@@ -111,172 +93,125 @@ public class SquareMoverManager : MonoBehaviour
                 Destroy(child.gameObject);
             }
         }
-        // Debug.Log("[SquareMoverManager] All movers cleared.");
     }
 
     /// <summary>
-    /// 현재 활성화된 레인들을 기반으로 네모들을 설정하고 이동시킵니다.
+    /// 레인 정보를 기반으로 네모 생성 및 속도 설정
     /// </summary>
-    private void SetupMovers()
+    public void SetupMovers()
     {
-        ClearAllMovers(); // 이전 네모들 확실히 정리
-
-        if (ColorLaneManager.Instance == null)
-        {
-            Debug.LogWarning("[SquareMoverManager] ColorLaneManager.Instance is null. Cannot setup movers.");
-            return;
-        }
+        // [추가] 레인 데이터가 준비되었는지 확인하는 로직을 여기에 넣거나,
+        // GazeLineDrawer에서 호출하기 전에 레인이 준비되었다고 가정합니다.
+        // 여기서는 준비되었다고 가정하고 진행합니다.
+        
+        ClearAllMovers();
 
         var lanes = ColorLaneManager.Instance.GetAllColorLanes();
         if (lanes == null || lanes.Count == 0)
         {
-            // Debug.Log("[SquareMoverManager] No lanes available from ColorLaneManager. Movers will not be set up.");
-            currentLaneSpeeds = new float[0]; // 속도 배열도 초기화
+            currentLaneSpeeds = new float[0];
             return;
         }
 
-        int laneCount = lanes.Count;
-        // Debug.Log($"[SquareMoverManager] Setting up movers for {laneCount} lanes.");
+        currentLaneSpeeds = new float[lanes.Count];
 
-        currentLaneSpeeds = new float[laneCount]; // 현재 레인 수에 맞게 속도 배열 크기 조정
+        var sortedLanes = lanes
+            .Select(l => new { lane = l, length = GetPathLength(l.positions) })
+            .OrderByDescending(l => l.length)
+            .ToList();
 
-        for (int i = 0; i < laneCount; i++)
+        for (int i = 0; i < sortedLanes.Count; i++)
         {
-            var laneInfo = lanes[i];
+            var laneInfo = sortedLanes[i].lane;
+            float assignedSpeed = (i < predefinedSpeeds.Length)
+                ? predefinedSpeeds[predefinedSpeeds.Length - 1 - i]
+                : predefinedSpeeds.First();
 
-            // 레인 정보 유효성 검사
-            if (laneInfo == null || laneInfo.positions == null || laneInfo.positions.Count < 2 || laneInfo.lineRenderer == null)
-            {
-                Debug.LogWarning($"[SquareMoverManager] Lane {i} (Name: {(laneInfo?.gameObject.name ?? "N/A")}) is invalid or has insufficient data. Skipping mover creation for this lane.");
-                if (i < currentLaneSpeeds.Length) currentLaneSpeeds[i] = 0f; // 해당 레인 속도 0으로 기록
-                continue;
-            }
+            int originalIndex = lanes.IndexOf(laneInfo);
+            if (originalIndex >= 0 && originalIndex < currentLaneSpeeds.Length)
+                currentLaneSpeeds[originalIndex] = assignedSpeed;
 
-            float length = GetPathLength(laneInfo.positions);
-
-            // predefinedSpeeds 배열의 크기를 넘어서는 인덱스 접근 방지
-            float speed = (i < predefinedSpeeds.Length) ? predefinedSpeeds[i] : predefinedSpeeds[predefinedSpeeds.Length - 1];
-
-            if (speed <= 0) // 속도가 0 이하인 경우 처리
-            {
-                Debug.LogWarning($"[SquareMoverManager] Lane {i} ('{laneInfo.gameObject.name}') has invalid speed ({speed}). Using a very small default speed.");
-                speed = 0.1f; // 0으로 나누는 것을 방지하기 위한 매우 느린 속도
-            }
-            float duration = length / speed;
-
-            if (i < currentLaneSpeeds.Length) currentLaneSpeeds[i] = speed; // 계산된 속도 저장
-
-            CreateAndMoveSquare(laneInfo, duration, i);
-            // Debug.Log($"[SquareMoverManager] Created mover for Lane {i} ('{laneInfo.gameObject.name}'). Length={length:F2}, Speed={speed:F2}, Duration={duration:F2}");
+            CreateAndMoveSquare(laneInfo, assignedSpeed, originalIndex);
         }
     }
 
     /// <summary>
-    /// 특정 레인에 네모를 생성하고 이동 코루틴을 시작합니다.
+    /// 특정 레인에 네모를 생성하고 지정된 속도로 움직이게 함
     /// </summary>
-    private void CreateAndMoveSquare(ColorLaneInfo lane, float duration, int uniqueIndex)
+    private void CreateAndMoveSquare(ColorLaneInfo lane, float speed, int uniqueIndex)
     {
-        // 네이밍에 lane의 GameObject 이름을 사용하여 어떤 레인에 속한 네모인지 구분 용이하게 함
         GameObject squareObj = new GameObject($"MovingSquare_on_{lane.gameObject.name}_id{uniqueIndex}");
-        squareObj.transform.parent = this.transform; // SquareMoverManager의 자식으로 설정
+        squareObj.transform.parent = this.transform;
 
         var sr = squareObj.AddComponent<SpriteRenderer>();
         sr.sprite = squareSprite;
 
-        if (lane.lineRenderer == null || !lane.lineRenderer.enabled)
-        {
-            Debug.LogError($"[SquareMoverManager] Cannot create square for lane '{lane.gameObject.name}'. LineRenderer is null or disabled.");
-            Destroy(squareObj);
-            return;
-        }
-
+        // 크기 설정 (라인 굵기 × sizeMultiplier)
         float size = lane.lineRenderer.widthMultiplier * sizeMultiplier;
         squareObj.transform.localScale = new Vector3(size, size, 1f);
-        sr.sortingOrder = 2; // 라인보다 위에 보이도록 (라인의 sortingOrder가 1 또는 그 이하로 가정)
+        sr.sortingOrder = 2;
 
         if (matchLineColor)
-        {
             sr.color = lane.lineRenderer.startColor;
-        }
 
-        if (lane.positions != null && lane.positions.Count > 0)
-        {
-            squareObj.transform.position = lane.positions[0]; // 경로의 시작점에 배치
-        }
-        else
-        {
-            // 경로 정보가 없는 경우 (이론상 발생하면 안됨)
-            Debug.LogWarning($"[SquareMoverManager] Lane '{lane.gameObject.name}' has no positions. Square will start at origin.");
-            squareObj.transform.position = Vector3.zero;
-        }
+        // 시작 위치를 경로의 첫 지점으로 설정
+        squareObj.transform.position = lane.positions[0];
 
-        Coroutine moveRoutine = StartCoroutine(MoveSquareLoop(squareObj.transform, lane.positions, duration));
+        // 이동 코루틴 실행
+        Coroutine moveRoutine = StartCoroutine(MoveSquareLoop(squareObj.transform, lane.positions, speed));
         activeMoveCoroutines.Add(moveRoutine);
     }
 
     /// <summary>
-    /// 네모가 지정된 경로를 따라 반복적으로 이동하는 코루틴입니다.
+    /// 네모가 경로를 일정한 속도로 계속 반복 이동함
     /// </summary>
-    private IEnumerator MoveSquareLoop(Transform square, List<Vector3> path, float duration)
+    private IEnumerator MoveSquareLoop(Transform square, List<Vector3> path, float speed)
     {
-        // 입력 값 유효성 검사
         if (square == null || path == null || path.Count < 2)
-        {
-            // Debug.LogError("[SquareMoverManager] MoveSquareLoop cannot start due to invalid parameters (square, path, or path count).");
             yield break;
-        }
-        if (duration <= 0)
+
+        int segmentIndex = 0;
+        Vector3 start = path[segmentIndex];
+        Vector3 end = path[segmentIndex + 1];
+        square.position = start;
+
+        while (true)
         {
-            // Debug.LogError($"[SquareMoverManager] MoveSquareLoop cannot start due to invalid duration: {duration}. Setting square to end of path.");
-            square.position = path[path.Count - 1]; // 바로 끝점으로 이동
-            yield break;
-        }
+            float traveled = 0f;
+            float segmentLength = Vector3.Distance(start, end);
 
-
-        while (true) // 경로를 따라 무한 반복 이동
-        {
-            square.position = path[0]; // 매 루프 시작 시, 경로의 첫 번째 위치로 네모를 리셋
-
-            float elapsedTime = 0f;
-            while (elapsedTime < duration)
+            while (traveled < segmentLength)
             {
-                if (square == null) yield break; // 이동 중 네모가 파괴된 경우 코루틴 중지
+                if (square == null) yield break;
 
-                float t = elapsedTime / duration; // 현재 진행도 (0에서 1 사이)
+                float step = speed * Time.deltaTime;
+                traveled += step;
+                float t = Mathf.Clamp01(traveled / segmentLength);
+                square.position = Vector3.Lerp(start, end, t);
 
-                // 경로상의 정확한 위치 계산
-                float totalSegments = path.Count - 1;
-                float currentPathProgress = t * totalSegments; // 전체 경로에서의 진행도 (예: 0 ~ 3 사이 값, 점이 4개일 경우)
-                int currentIndex = Mathf.FloorToInt(currentPathProgress);
-                // 다음 인덱스가 경로 길이를 초과하지 않도록 보장
-                int nextIndex = Mathf.Min(currentIndex + 1, path.Count - 1);
-
-                // 현재 세그먼트 내에서의 보간 값 (0에서 1 사이)
-                float segmentLerpT = currentPathProgress - currentIndex;
-
-                Vector3 pos = Vector3.Lerp(path[currentIndex], path[nextIndex], segmentLerpT);
-                square.position = pos;
-
-                elapsedTime += Time.deltaTime;
-                yield return null; // 다음 프레임까지 대기
+                yield return null;
             }
-            // 한 바퀴 이동 완료 후, 네모를 경로의 마지막 지점에 정확히 위치시킴
-            if (square != null) square.position = path[path.Count - 1];
 
-            // 선택: 한 루프 완료 후 잠시 대기하고 다시 시작하려면 아래 주석 해제
-            // yield return new WaitForSeconds(0.1f); 
+            // 다음 세그먼트로 이동
+            segmentIndex++;
+            if (segmentIndex >= path.Count - 1)
+                segmentIndex = 0;
+
+            start = path[segmentIndex];
+            end = path[segmentIndex + 1];
+            square.position = start;
         }
     }
 
     /// <summary>
-    /// 주어진 경로(점들의 리스트)의 총 길이를 계산합니다.
+    /// 경로의 전체 길이 계산 (벡터 거리 누적합)
     /// </summary>
     private float GetPathLength(List<Vector3> path)
     {
         if (path == null || path.Count < 2) return 0f;
 
         float length = 0f;
-        for (int i = 0; i < path.Count - 1; i++) // path.Count - 1 까지 반복해야 마지막 세그먼트 포함
+        for (int i = 0; i < path.Count - 1; i++)
         {
             length += Vector3.Distance(path[i], path[i + 1]);
         }

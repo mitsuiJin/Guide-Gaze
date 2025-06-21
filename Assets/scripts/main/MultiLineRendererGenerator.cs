@@ -134,8 +134,22 @@ public class MultiLineRendererGenerator : MonoBehaviour
     }
     void Update()
     { /* 이전과 동일 */
-        if (Input.GetKeyDown(regenerateKey)) { isInPatternMode = true; if (definedPatterns.Count > 0) { currentPatternIndex++; if (currentPatternIndex >= definedPatterns.Count) { currentPatternIndex = 0; } Debug.Log($"[MLRG] Applying pattern: {definedPatterns[currentPatternIndex].name} (Index: {currentPatternIndex})", this); 
-            } 
+        if (Input.GetKeyDown(regenerateKey)) {
+            isInPatternMode = true;
+            if (SquareMoverManager.Instance != null)
+            {
+                SquareMoverManager.Instance.ClearAllMovers();
+            }
+            if (GazeLineDrawer.Instance != null)
+            {
+                GazeLineDrawer.Instance.ForceStopTracking();
+            }
+
+            if (definedPatterns.Count > 0)
+            {
+                currentPatternIndex++; if (currentPatternIndex >= definedPatterns.Count) { currentPatternIndex = 0; }
+                Debug.Log($"[MLRG] Applying pattern: {definedPatterns[currentPatternIndex].name} (Index: {currentPatternIndex})", this);
+            }
             else { currentPatternIndex = -1; Debug.LogWarning("[MLRG] Regenerate key pressed, but no patterns are defined.", this); } 
             ProcessLaneGeneration();
             UpdatePatternNameUI();
@@ -429,12 +443,23 @@ public class MultiLineRendererGenerator : MonoBehaviour
     void DrawQuadraticBezier(int colorIndex, Vector2 p0, Vector2 p1, Vector2 p2, string targetKeyName)
     { /* 이전과 동일 */
         GameObject lineObj = new GameObject("Curve_Quad_" + targetKeyName + "_" + colorIndex); lineObj.transform.parent = this.transform; LineRenderer lr = lineObj.AddComponent<LineRenderer>(); lr.useWorldSpace = true; lr.positionCount = curveResolution; lr.widthMultiplier = 0.1f; lr.sortingOrder = 1; float hue = colorIndex / (float)REQUIRED_TARGET_KEYS; Color colorVal = Color.HSVToRGB(hue, 1f, 1f); if (lineMaterialTemplate != null) { Material matInstance = new Material(lineMaterialTemplate); matInstance.color = colorVal; lr.material = matInstance; }
-        lr.startColor = colorVal; lr.endColor = colorVal; ColorLaneInfo cli = lineObj.GetComponent<ColorLaneInfo>(); if (cli == null) cli = lineObj.AddComponent<ColorLaneInfo>(); if (cli.positions == null) cli.positions = new List<Vector3>(); else cli.positions.Clear(); for (int k = 0; k < curveResolution; k++) { float t = k / (float)(curveResolution - 1); Vector2 pointOnCurve = Mathf.Pow(1 - t, 2) * p0 + 2 * (1 - t) * t * p1 + Mathf.Pow(t, 2) * p2; Vector3 point3D = new Vector3(pointOnCurve.x, pointOnCurve.y, 0f); lr.SetPosition(k, point3D); if (cli.positions != null) cli.positions.Add(point3D); }
+        lr.startColor = colorVal; lr.endColor = colorVal;
+        ColorLaneInfo cli = lineObj.GetComponent<ColorLaneInfo>();
+        if (cli == null) cli = lineObj.AddComponent<ColorLaneInfo>();
+
+        cli.keyName = targetKeyName;
+
+        if (cli.positions == null) cli.positions = new List<Vector3>(); else cli.positions.Clear(); for (int k = 0; k < curveResolution; k++) { float t = k / (float)(curveResolution - 1); Vector2 pointOnCurve = Mathf.Pow(1 - t, 2) * p0 + 2 * (1 - t) * t * p1 + Mathf.Pow(t, 2) * p2; Vector3 point3D = new Vector3(pointOnCurve.x, pointOnCurve.y, 0f); lr.SetPosition(k, point3D); if (cli.positions != null) cli.positions.Add(point3D); }
     }
     void DrawCubicBezier(int colorIndex, Vector2 p0, Vector2 cp1, Vector2 cp2, Vector2 p3, string targetKeyName)
     { /* 이전과 동일 */
         GameObject lineObj = new GameObject("Curve_Cubic_" + targetKeyName + "_" + colorIndex); lineObj.transform.parent = this.transform; LineRenderer lr = lineObj.AddComponent<LineRenderer>(); lr.useWorldSpace = true; lr.positionCount = curveResolution; lr.widthMultiplier = 0.1f; lr.sortingOrder = 1; float hue = colorIndex / (float)REQUIRED_TARGET_KEYS; Color colorVal = Color.HSVToRGB(hue, 1f, 1f); if (lineMaterialTemplate != null) { Material matInstance = new Material(lineMaterialTemplate); matInstance.color = colorVal; lr.material = matInstance; }
-        lr.startColor = colorVal; lr.endColor = colorVal; ColorLaneInfo cli = lineObj.GetComponent<ColorLaneInfo>(); if (cli == null) cli = lineObj.AddComponent<ColorLaneInfo>(); if (cli.positions == null) cli.positions = new List<Vector3>(); else cli.positions.Clear(); for (int k = 0; k < curveResolution; k++) { float t = k / (float)(curveResolution - 1); float omt = 1f - t; float omt2 = omt * omt; float t2 = t * t; Vector2 pointOnCurve = omt * omt2 * p0 + 3f * omt2 * t * cp1 + 3f * omt * t2 * cp2 + t * t2 * p3; Vector3 point3D = new Vector3(pointOnCurve.x, pointOnCurve.y, 0f); lr.SetPosition(k, point3D); if (cli.positions != null) cli.positions.Add(point3D); }
+        lr.startColor = colorVal; lr.endColor = colorVal; ColorLaneInfo cli = lineObj.GetComponent<ColorLaneInfo>();
+        if (cli == null) cli = lineObj.AddComponent<ColorLaneInfo>();
+
+        cli.keyName = targetKeyName;
+
+        if (cli.positions == null) cli.positions = new List<Vector3>(); else cli.positions.Clear(); for (int k = 0; k < curveResolution; k++) { float t = k / (float)(curveResolution - 1); float omt = 1f - t; float omt2 = omt * omt; float t2 = t * t; Vector2 pointOnCurve = omt * omt2 * p0 + 3f * omt2 * t * cp1 + 3f * omt * t2 * cp2 + t * t2 * p3; Vector3 point3D = new Vector3(pointOnCurve.x, pointOnCurve.y, 0f); lr.SetPosition(k, point3D); if (cli.positions != null) cli.positions.Add(point3D); }
     }
 
 }
